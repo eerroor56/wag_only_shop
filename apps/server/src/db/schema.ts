@@ -75,6 +75,8 @@ export const products = pgTable(
     discountPercent: smallint('discount_percent'),
     /** Дополнительные характеристики [{name, value}]. */
     attributes: jsonb('attributes').$type<ProductAttribute[]>().notNull().default([]),
+    /** Доступные размеры в порядке отображения (M, 48, 48-52, 52/54…). Пусто — товар без размера. */
+    sizes: text('sizes').array().notNull().default(sql`'{}'::text[]`),
     isActive: boolean('is_active').notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: createdAt(),
@@ -139,11 +141,13 @@ export const cartItems = pgTable(
     productId: integer('product_id')
       .notNull()
       .references(() => products.id, { onDelete: 'cascade' }),
+    /** Выбранный размер; '' — товар без размера. */
+    size: varchar('size', { length: 20 }).notNull().default(''),
     quantity: integer('quantity').notNull(),
     createdAt: createdAt(),
   },
   (t) => [
-    unique('cart_items_cart_product_uq').on(t.cartId, t.productId),
+    unique('cart_items_cart_product_size_uq').on(t.cartId, t.productId, t.size),
     check('cart_items_quantity_check', sql`${t.quantity} BETWEEN 1 AND 99`),
   ],
 );
@@ -192,6 +196,8 @@ export const orderItems = pgTable(
     productId: integer('product_id').references(() => products.id, { onDelete: 'set null' }),
     productTitleSnapshot: varchar('product_title_snapshot', { length: 200 }).notNull(),
     priceSnapshot: integer('price_snapshot').notNull(),
+    /** Размер на момент заказа. */
+    sizeSnapshot: varchar('size_snapshot', { length: 20 }),
     quantity: integer('quantity').notNull(),
     total: integer('total').notNull(),
   },

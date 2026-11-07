@@ -1,6 +1,26 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronRight, Settings } from 'lucide-react';
 import { Link } from 'react-router';
-import { useShopConfig } from '../api/queries';
+import { haptic } from '@wag/web';
+import { useMe, useShopConfig } from '../api/queries';
+
+/** Вход в админ-панель. Кнопку видят только администраторы; доступ всё равно проверяет сервер. */
+function AdminEntry() {
+  const { data: me } = useMe();
+  if (!me?.isAdmin) return null;
+  return (
+    // Админка — отдельное приложение на том же домене; Telegram SDK сохраняет авторизацию при переходе.
+    <a href="/admin/" className="admin-entry" onClick={() => haptic.impact('light')}>
+      <span className="admin-entry-icon">
+        <Settings size={20} strokeWidth={1.8} />
+      </span>
+      <span className="admin-entry-text">
+        <span className="admin-entry-title">Админ-панель</span>
+        <span className="admin-entry-subtitle">Товары, заказы, клиенты и рассылка</span>
+      </span>
+      <ChevronRight size={18} className="admin-entry-chevron" />
+    </a>
+  );
+}
 
 export function HomePage() {
   const { data: config } = useShopConfig();
@@ -24,6 +44,7 @@ export function HomePage() {
           Открыть каталог
           <ArrowRight size={18} strokeWidth={2} />
         </Link>
+        <AdminEntry />
       </div>
 
       <section className="home-steps" aria-label="Как сделать заказ">

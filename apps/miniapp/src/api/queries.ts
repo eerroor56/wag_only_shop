@@ -8,6 +8,7 @@ import {
 import type {
   CartDTO,
   CheckoutInput,
+  MeDTO,
   OrderDTO,
   ProductDetailDTO,
   ProductsPageDTO,
@@ -28,6 +29,7 @@ export const queryClient = new QueryClient({
 
 export const keys = {
   config: ['config'] as const,
+  me: ['me'] as const,
   products: ['products'] as const,
   product: (id: number) => ['product', id] as const,
   cart: ['cart'] as const,
@@ -35,6 +37,11 @@ export const keys = {
 };
 
 const CART_MUTATION = ['cart-mutation'];
+
+/** Текущий пользователь; isAdmin определяет сервер по ADMIN_TELEGRAM_IDS. */
+export function useMe() {
+  return useQuery({ queryKey: keys.me, queryFn: () => api.get<MeDTO>('/api/me'), staleTime: 5 * 60_000 });
+}
 
 export function useShopConfig() {
   return useQuery({
@@ -105,8 +112,12 @@ export function useAddToCart() {
   const { qc, applyServerCart } = useCartMutationHelpers();
   return useMutation({
     mutationKey: CART_MUTATION,
-    mutationFn: (vars: { productId: number; quantity?: number }) =>
-      api.post<CartDTO>('/api/cart/items', { productId: vars.productId, quantity: vars.quantity ?? 1 }),
+    mutationFn: (vars: { productId: number; quantity?: number; size?: string | null }) =>
+      api.post<CartDTO>('/api/cart/items', {
+        productId: vars.productId,
+        quantity: vars.quantity ?? 1,
+        size: vars.size ?? null,
+      }),
     onSuccess: applyServerCart,
     onError: () => void qc.invalidateQueries({ queryKey: keys.cart }),
   });

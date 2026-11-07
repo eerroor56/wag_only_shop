@@ -45,6 +45,8 @@ export interface ProductCardDTO {
   /** Процент скидки для отображения (ручной или вычисленный), null — без скидки. */
   discountPercent: number | null;
   image: ImageDTO | null;
+  /** Доступные размеры (пусто — без размера). */
+  sizes: string[];
 }
 
 export interface ProductDetailDTO extends ProductCardDTO {
@@ -63,9 +65,13 @@ export interface ProductsPageDTO {
 export interface CartItemDTO {
   id: number;
   productId: number;
+  /** Выбранный размер или null для товара без размеров. */
+  size: string | null;
   quantity: number;
-  /** false — товар скрыт, оформить его нельзя. */
+  /** false — оформить позицию нельзя (см. unavailableReason). */
   available: boolean;
+  /** hidden — товар скрыт; size — выбранного размера больше нет или нужно выбрать размер. */
+  unavailableReason: 'hidden' | 'size' | null;
   lineTotal: number;
   product: ProductCardDTO;
 }
@@ -82,6 +88,7 @@ export interface OrderItemDTO {
   id: number;
   productId: number | null;
   title: string;
+  size: string | null;
   price: number;
   quantity: number;
   total: number;
@@ -119,6 +126,7 @@ export interface AdminProductDTO {
   /** Что увидит покупатель. */
   effectiveDiscountPercent: number | null;
   attributes: ProductAttribute[];
+  sizes: string[];
   isActive: boolean;
   sortOrder: number;
   images: AdminImageDTO[];

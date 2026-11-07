@@ -26,7 +26,7 @@ export async function shopRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.post('/api/cart/items', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
     const body = parseInput(cartAddSchema, req.body);
-    return ctx.cart.addItem(getAuth(req).userId, body.productId, body.quantity);
+    return ctx.cart.addItem(getAuth(req).userId, body.productId, body.quantity, body.size);
   });
 
   app.patch('/api/cart/items/:id', { config: { rateLimit: { max: 240, timeWindow: '1 minute' } } }, async (req) => {

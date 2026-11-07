@@ -67,6 +67,7 @@ export class OrderNotifier {
         createdAt: order.createdAt,
         items: items.map((i) => ({
           title: i.productTitleSnapshot,
+          size: i.sizeSnapshot,
           price: i.priceSnapshot,
           quantity: i.quantity,
           total: i.total,

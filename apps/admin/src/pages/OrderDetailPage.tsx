@@ -144,6 +144,7 @@ export function OrderDetailPage() {
                     {item.title} <span className="caption">(товар удалён)</span>
                   </span>
                 )}
+                {item.size && <span className="order-item-size">Размер {item.size}</span>}
               </div>
               <div className="order-item-calc">
                 {item.quantity} × {formatPrice(item.price)} = <b>{formatPrice(item.total)}</b>

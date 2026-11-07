@@ -19,6 +19,7 @@ interface DemoProduct {
   oldPrice?: number;
   discountPercent?: number;
   attributes: { name: string; value: string }[];
+  sizes?: string[];
   shades: string[];
 }
 
@@ -36,6 +37,7 @@ const DEMO: DemoProduct[] = [
       { name: 'Материал', value: '66% хлопок, 34% полиэстер' },
       { name: 'Цвет', value: 'Чёрный' },
     ],
+    sizes: ['S', 'M', 'L', 'XL'],
     shades: ['#1c1c1e', '#2c2c2e', '#3a3a3c'],
   },
   {
@@ -46,6 +48,7 @@ const DEMO: DemoProduct[] = [
       { name: 'Бренд', value: 'Adidas Originals' },
       { name: 'Материал', value: '100% хлопок' },
     ],
+    sizes: ['M/L', 'XL/XXL'],
     shades: ['#e5e5ea', '#d1d1d6', '#c7c7cc'],
   },
   {
@@ -58,6 +61,7 @@ const DEMO: DemoProduct[] = [
       { name: 'Бренд', value: 'Stone Island' },
       { name: 'Страна', value: 'Италия' },
     ],
+    sizes: ['46', '48', '50', '52', '54'],
     shades: ['#48484a', '#636366', '#3a3a3c', '#2c2c2e'],
   },
   {
@@ -68,6 +72,7 @@ const DEMO: DemoProduct[] = [
       { name: 'Бренд', value: 'The North Face' },
       { name: 'Утеплитель', value: 'Пух 700 FP' },
     ],
+    sizes: ['48-52', '52/54'],
     shades: ['#0f0f10', '#1c1c1e', '#2c2c2e'],
   },
   {
@@ -132,6 +137,7 @@ async function main() {
           oldPrice: demo.oldPrice ?? null,
           discountPercent: demo.discountPercent ?? null,
           attributes: demo.attributes,
+          sizes: demo.sizes ?? [],
           sortOrder: i,
         })
         .returning({ id: products.id });

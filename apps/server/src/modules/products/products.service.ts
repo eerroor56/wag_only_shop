@@ -38,6 +38,7 @@ export class ProductsService {
       oldPrice: p.oldPrice != null && p.oldPrice > p.price ? p.oldPrice : null,
       discountPercent: effectiveDiscountPercent(p),
       image: image ? toImageDTO(image, this.storage) : null,
+      sizes: p.sizes,
     };
   }
 
@@ -53,6 +54,7 @@ export class ProductsService {
       discountPercent: p.discountPercent,
       effectiveDiscountPercent: effectiveDiscountPercent(p),
       attributes: p.attributes,
+      sizes: p.sizes,
       isActive: p.isActive,
       sortOrder: p.sortOrder,
       images: sorted.map((i): AdminImageDTO => ({ ...toAdminImageDTO(i, this.storage), isMain: i.id === main?.id })),
@@ -159,6 +161,7 @@ export class ProductsService {
           oldPrice: input.oldPrice,
           discountPercent: input.discountPercent,
           attributes: input.attributes,
+          sizes: input.sizes,
           isActive: input.isActive,
           sortOrder: (minOrder ?? 1) - 1,
         })
@@ -183,6 +186,7 @@ export class ProductsService {
         oldPrice: patch.oldPrice !== undefined ? patch.oldPrice : current.oldPrice,
         discountPercent: patch.discountPercent !== undefined ? patch.discountPercent : current.discountPercent,
         attributes: patch.attributes ?? current.attributes,
+        sizes: patch.sizes ?? current.sizes,
         isActive: patch.isActive ?? current.isActive,
         imageIds: patch.imageIds ?? sorted.map((i) => i.id),
         mainImageId: patch.mainImageId !== undefined ? patch.mainImageId : (mainImage(sorted)?.id ?? null),
@@ -199,6 +203,7 @@ export class ProductsService {
           oldPrice: merged.oldPrice,
           discountPercent: merged.discountPercent,
           attributes: merged.attributes,
+          sizes: merged.sizes,
           isActive: merged.isActive,
         })
         .where(eq(products.id, id));

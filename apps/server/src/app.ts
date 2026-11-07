@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
@@ -137,7 +137,9 @@ export async function buildApp(
 
   // ---------------------------------------------------------------- static
 
-  let staticRegistered = false;
+  // Каждый экземпляр @fastify/static применяет свои setHeaders. reply.sendFile() не используем:
+  // декоратор принадлежит одному из экземпляров, и его заголовки (например, sandbox-CSP загрузок)
+  // попали бы на HTML-страницы и заблокировали скрипты.
   if (config.storage.driver === 'local') {
     await mkdir(config.storage.uploadDir, { recursive: true });
     await app.register(fastifyStatic, {
@@ -146,7 +148,7 @@ export async function buildApp(
       index: false,
       list: false,
       dotfiles: 'deny',
-      decorateReply: !staticRegistered,
+      decorateReply: false,
       // Загруженные файлы — только изображения; запрещаем интерпретацию как HTML/скрипт.
       setHeaders: (res) => {
         void res.header('X-Content-Type-Options', 'nosniff');
@@ -155,10 +157,9 @@ export async function buildApp(
         void res.header('Cross-Origin-Resource-Policy', 'cross-origin');
       },
     });
-    staticRegistered = true;
   }
 
-  const spaRoots: { prefix: string; dir: string }[] = [];
+  const spaRoots: { prefix: string; html: string }[] = [];
   if (config.static.enabled) {
     for (const [prefix, dir] of [
       ['/admin/', config.static.adminDir],
@@ -176,7 +177,7 @@ export async function buildApp(
         redirect: true,
         wildcard: true,
         dotfiles: 'deny',
-        decorateReply: !staticRegistered,
+        decorateReply: false,
         setHeaders: (res, filePath) => {
           void res.header(
             'Cache-Control',
@@ -184,8 +185,7 @@ export async function buildApp(
           );
         },
       });
-      staticRegistered = true;
-      spaRoots.push({ prefix, dir });
+      spaRoots.push({ prefix, html: readFileSync(path.join(dir, 'index.html'), 'utf8') });
     }
   }
 
@@ -197,8 +197,7 @@ export async function buildApp(
     if ((req.method === 'GET' || req.method === 'HEAD') && !isFile && !url.startsWith('/api/') && !url.startsWith('/uploads/')) {
       const root = spaRoots.find((r) => url.startsWith(r.prefix) || `${url}/` === r.prefix);
       if (root) {
-        void reply.header('Cache-Control', 'no-cache');
-        return reply.sendFile('index.html', root.dir);
+        return reply.header('Cache-Control', 'no-cache').type('text/html; charset=utf-8').send(root.html);
       }
     }
     return reply.code(404).send(errorBody('NOT_FOUND', 'Не найдено'));

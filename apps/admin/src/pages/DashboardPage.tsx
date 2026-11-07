@@ -1,4 +1,4 @@
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight, Plus, Store } from 'lucide-react';
 import { Link } from 'react-router';
 import { formatPrice } from '@wag/shared';
 import { ErrorState, errorMessage, Skeleton } from '@wag/web';
@@ -22,7 +22,16 @@ export function DashboardPage() {
 
   return (
     <div className="container">
-      <PageHeader title="Dashboard" subtitle={me ? `Здравствуйте, ${me.firstName || 'администратор'}` : 'WAG Shop'} />
+      <PageHeader
+        title="Dashboard"
+        subtitle={me ? `Здравствуйте, ${me.firstName || 'администратор'}` : 'WAG Shop'}
+        action={
+          // Mini App магазина — отдельное приложение на том же домене.
+          <a href="/" className="btn btn-outline btn-sm">
+            <Store size={15} /> В магазин
+          </a>
+        }
+      />
 
       {isError ? (
         <ErrorState message={errorMessage(error)} onRetry={() => void refetch()} />

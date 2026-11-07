@@ -12,6 +12,7 @@ import type { Database } from '../../db/client.js';
 import { cartItems, carts, orderItems, orders, products, users, type Order, type OrderItem, type User } from '../../db/schema.js';
 import { AppError, badRequest, conflict, notFound, validationError } from '../../lib/errors.js';
 import { escapeLike } from '../../lib/format.js';
+import { NO_SIZE, resolveSize, unavailableReason } from '../cart/size-availability.js';
 
 export interface CreateOrderResult {
   order: OrderDTO;
@@ -24,6 +25,7 @@ function toItemDTO(i: OrderItem): OrderItemDTO {
     id: i.id,
     productId: i.productId,
     title: i.productTitleSnapshot,
+    size: i.sizeSnapshot,
     price: i.priceSnapshot,
     quantity: i.quantity,
     total: i.total,
@@ -101,17 +103,19 @@ export class OrdersService {
           .orderBy(asc(cartItems.createdAt), asc(cartItems.id));
 
         if (!rows.length) throw new AppError(400, 'CART_EMPTY', 'Корзина пуста');
-        const unavailable = rows.filter((r) => !r.product.isActive);
+        const unavailable = rows.filter((r) => unavailableReason(r.product, r.item.size) !== null);
         if (unavailable.length) {
+          const names = unavailable.map((r) => (r.item.size ? `${r.product.title} (${r.item.size})` : r.product.title));
           throw conflict(
             'CART_HAS_UNAVAILABLE',
-            `Некоторые товары больше недоступны: ${unavailable.map((r) => r.product.title).join(', ')}. Удалите их из корзины.`,
+            `Некоторые позиции больше недоступны: ${names.join(', ')}. Удалите их из корзины.`,
           );
         }
 
         const lines = rows.map(({ item, product }) => ({
           productId: product.id,
           productTitleSnapshot: product.title,
+          sizeSnapshot: item.size === NO_SIZE ? null : resolveSize(product, item.size),
           priceSnapshot: product.price,
           quantity: item.quantity,
           total: product.price * item.quantity,

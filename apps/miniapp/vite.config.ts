@@ -14,6 +14,8 @@ export default defineConfig({
     proxy: {
       '/api': backend,
       '/uploads': backend,
+      // Админка в dev обслуживается отдельным Vite (порт 5174) — проксируем, чтобы переход /admin/ работал как в production.
+      '/admin': { target: process.env.VITE_ADMIN_DEV_URL ?? 'http://localhost:5174', ws: true },
     },
   },
   build: {

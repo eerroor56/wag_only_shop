@@ -39,18 +39,43 @@ export function createTelegramBot(config: AppConfig, usersService: UsersService,
   // Кнопки web_app работают только в личных чатах с ботом — в группах бот молчит.
   const pm = bot.chatType('private');
 
-  pm.command('start', async (ctx) => {
-    await ctx.reply(welcomeText(config), { parse_mode: 'HTML', reply_markup: shopKeyboard(config) });
+  /**
+   * Чат с ботом остаётся чистым: Telegram не позволяет запретить ввод сообщений,
+   * поэтому любые входящие сообщения пользователя (текст, контакт, стикеры, /start)
+   * удаляются сразу после обработки, а бот на них не отвечает.
+   */
+  pm.on('message', async (ctx, next) => {
+    try {
+      await next();
+    } finally {
+      await ctx.deleteMessage().catch(() => undefined);
+    }
   });
 
+  /** Последнее служебное сообщение бота в чате (приветствие / админ-панель) — при повторе заменяем его. */
+  const lastServiceMessage = new Map<number, number>();
+  async function replaceServiceMessage(chatId: number, send: () => Promise<{ message_id: number }>) {
+    const previous = lastServiceMessage.get(chatId);
+    const sent = await send();
+    if (lastServiceMessage.size > 50_000) lastServiceMessage.clear();
+    lastServiceMessage.set(chatId, sent.message_id);
+    if (previous) await bot.api.deleteMessage(chatId, previous).catch(() => undefined);
+  }
+
+  pm.command('start', async (ctx) => {
+    await replaceServiceMessage(ctx.chat.id, () =>
+      ctx.reply(welcomeText(config), { parse_mode: 'HTML', reply_markup: shopKeyboard(config) }),
+    );
+  });
+
+  // Основной вход в админку — кнопка в Mini App; команда оставлена для администраторов как запасной путь.
   pm.command('admin', async (ctx) => {
-    if (!isAdmin(ctx.from?.id)) {
-      await ctx.reply(welcomeText(config), { parse_mode: 'HTML', reply_markup: shopKeyboard(config) });
-      return;
-    }
-    await ctx.reply('Админ-панель WAG Shop', {
-      reply_markup: new InlineKeyboard().webApp('Открыть админ-панель', config.adminUrl),
-    });
+    if (!isAdmin(ctx.from?.id)) return;
+    await replaceServiceMessage(ctx.chat.id, () =>
+      ctx.reply('Админ-панель WAG Shop', {
+        reply_markup: new InlineKeyboard().webApp('Открыть админ-панель', config.adminUrl),
+      }),
+    );
   });
 
   // Пользователь заблокировал / разблокировал бота.
@@ -59,10 +84,6 @@ export function createTelegramBot(config: AppConfig, usersService: UsersService,
     const status = ctx.myChatMember.new_chat_member.status;
     if (status === 'kicked') await usersService.setBlocked(ctx.myChatMember.from.id, true);
     if (status === 'member') await usersService.setBlocked(ctx.myChatMember.from.id, false);
-  });
-
-  pm.on('message', async (ctx) => {
-    await ctx.reply('Каталог и оформление заказа — в приложении магазина.', { reply_markup: shopKeyboard(config) });
   });
 
   bot.catch((err) => {

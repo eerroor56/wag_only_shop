@@ -1,5 +1,5 @@
 import { ArrowLeft, PackageX } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   EmptyState,
@@ -46,11 +46,26 @@ export function ProductPage() {
   const addToCart = useAddToCart();
   const updateItem = useUpdateCartItem();
 
-  const cartItem = cart?.items.find((i) => i.productId === productId && i.available);
+  const [pickedSize, setPickedSize] = useState<string | null>(null);
+  const [sizeError, setSizeError] = useState(false);
+  const sizes = product?.sizes ?? [];
+  // Единственный размер выбираем автоматически.
+  const selectedSize = sizes.length === 1 ? sizes[0]! : pickedSize && sizes.includes(pickedSize) ? pickedSize : null;
+  const needsSize = sizes.length > 0 && selectedSize === null;
+
+  const cartItem = cart?.items.find(
+    (i) => i.productId === productId && i.available && (i.size ?? null) === (sizes.length ? selectedSize : null),
+  );
 
   const onAdd = () => {
+    if (needsSize) {
+      setSizeError(true);
+      haptic.notify('error');
+      toast.error('Выберите размер');
+      return;
+    }
     addToCart.mutate(
-      { productId },
+      { productId, size: selectedSize },
       {
         onSuccess: () => {
           haptic.impact('light');
@@ -120,6 +135,33 @@ export function ProductPage() {
           size="lg"
         />
 
+        {sizes.length > 0 && (
+          <section className={`sizes ${sizeError ? 'has-error' : ''}`} aria-label="Размер">
+            <div className="sizes-head">
+              <span className="section-label">Размер</span>
+              {sizeError && <span className="field-error">Выберите размер</span>}
+            </div>
+            <div className="size-options" role="radiogroup">
+              {sizes.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  role="radio"
+                  aria-checked={selectedSize === s}
+                  className="size-option"
+                  onClick={() => {
+                    setPickedSize(s);
+                    setSizeError(false);
+                    haptic.selection();
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         {product.description && <p className="product-description">{product.description}</p>}
 
         {product.attributes.length > 0 && (
@@ -161,7 +203,15 @@ export function ProductPage() {
             onClick={onAdd}
             disabled={addToCart.isPending}
           >
-            {addToCart.isPending ? <Spinner size={18} /> : 'Добавить в корзину'}
+            {addToCart.isPending ? (
+              <Spinner size={18} />
+            ) : needsSize ? (
+              'Выберите размер'
+            ) : selectedSize && sizes.length > 1 ? (
+              `Добавить в корзину · ${selectedSize}`
+            ) : (
+              'Добавить в корзину'
+            )}
           </button>
         )}
       </div>

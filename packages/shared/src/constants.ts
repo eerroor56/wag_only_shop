@@ -8,6 +8,7 @@ export const LIMITS = {
   productAttributeNameMax: 60,
   productAttributeValueMax: 200,
   productImagesMax: 15,
+  productSizesMax: 30,
   imageMaxBytes: 10 * 1024 * 1024,
   customerNameMax: 100,
   broadcastTextMax: 4096,

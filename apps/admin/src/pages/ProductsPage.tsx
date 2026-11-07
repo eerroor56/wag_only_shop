@@ -49,6 +49,7 @@ function ProductRow({
             {product.oldPrice != null && <s>{formatPrice(product.oldPrice)}</s>}
             {product.effectiveDiscountPercent != null && <span>−{product.effectiveDiscountPercent}%</span>}
             <span>· {product.images.length} фото</span>
+            {product.sizes.length > 0 && <span>· {product.sizes.join(', ')}</span>}
           </div>
           {!product.isActive && <span className="pill">Скрыт</span>}
         </div>

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { LIMITS } from './constants.js';
 import { ORDER_STATUSES } from './order-status.js';
 import { normalizePhone } from './phone.js';
+import { normalizeSizeLabel, SIZE_LABEL_MAX, SIZE_LABEL_PATTERN, sizeKey } from './sizes.js';
 
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
@@ -18,11 +19,31 @@ export const idParamSchema = z.object({ id });
 
 const kopecks = z.number().int('Цена должна быть целым числом копеек').min(0, 'Цена не может быть отрицательной').max(LIMITS.priceMax);
 
+// ---------- Размеры ----------
+
+export const sizeLabelSchema = z
+  .string()
+  .transform(normalizeSizeLabel)
+  .pipe(
+    z
+      .string()
+      .min(1, 'Укажите размер')
+      .max(SIZE_LABEL_MAX, `Размер — не длиннее ${SIZE_LABEL_MAX} символов`)
+      .regex(SIZE_LABEL_PATTERN, 'Размер может содержать буквы, цифры, «-» и «/»'),
+  );
+
+export const sizesSchema = z
+  .array(sizeLabelSchema)
+  .max(LIMITS.productSizesMax, `Не более ${LIMITS.productSizesMax} размеров`)
+  .refine((list) => new Set(list.map(sizeKey)).size === list.length, 'Размеры повторяются');
+
 // ---------- Корзина ----------
 
 export const cartAddSchema = z.object({
   productId: z.number().int().positive(),
   quantity: z.number().int().min(1).max(LIMITS.cartItemMaxQuantity).default(1),
+  /** Обязателен, если у товара заданы размеры. */
+  size: sizeLabelSchema.nullable().optional(),
 });
 export type CartAddInput = z.infer<typeof cartAddSchema>;
 
@@ -67,6 +88,8 @@ export const productFieldsSchema = z.object({
   oldPrice: kopecks.nullable().default(null),
   discountPercent: z.number().int().min(1, 'Скидка от 1 до 99%').max(99, 'Скидка от 1 до 99%').nullable().default(null),
   attributes: z.array(productAttributeSchema).max(LIMITS.productAttributesMax).default([]),
+  /** Доступные размеры в порядке отображения. Пустой список — товар без размера. */
+  sizes: sizesSchema.default([]),
   isActive: z.boolean().default(true),
   /** Упорядоченный список загруженных изображений. */
   imageIds: z
@@ -113,6 +136,7 @@ export const productPatchSchema = z.object({
   oldPrice: kopecks.nullable().optional(),
   discountPercent: z.number().int().min(1).max(99).nullable().optional(),
   attributes: z.array(productAttributeSchema).max(LIMITS.productAttributesMax).optional(),
+  sizes: sizesSchema.optional(),
   isActive: z.boolean().optional(),
   imageIds: z.array(z.number().int().positive()).max(LIMITS.productImagesMax).optional(),
   mainImageId: z.number().int().positive().nullable().optional(),

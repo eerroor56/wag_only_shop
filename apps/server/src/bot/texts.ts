@@ -20,7 +20,7 @@ export interface OrderMessageData {
   telegramUsername: string | null;
   totalAmount: number;
   createdAt: Date;
-  items: { title: string; price: number; quantity: number; total: number }[];
+  items: { title: string; size: string | null; price: number; quantity: number; total: number }[];
 }
 
 /** Сообщение владельцу о новом заказе (parse_mode = HTML, все пользовательские данные экранированы). */
@@ -46,7 +46,7 @@ export function newOrderMessage(o: OrderMessageData, timeZone: string): string {
   ];
   o.items.forEach((item, idx) => {
     lines.push('');
-    lines.push(`${idx + 1}. ${escapeHtml(item.title)}`);
+    lines.push(`${idx + 1}. ${escapeHtml(item.title)}${item.size ? ` · размер <b>${escapeHtml(item.size)}</b>` : ''}`);
     lines.push(`    ${item.quantity} × ${escapeHtml(formatPrice(item.price))} = ${escapeHtml(formatPrice(item.total))}`);
   });
   lines.push('', `<b>Итого: ${escapeHtml(formatPrice(o.totalAmount))}</b>`);

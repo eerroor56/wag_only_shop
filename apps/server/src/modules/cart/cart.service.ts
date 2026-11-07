@@ -2,7 +2,8 @@ import { and, asc, count, eq, sql } from 'drizzle-orm';
 import { LIMITS, type CartDTO } from '@wag/shared';
 import type { Database, DbExecutor } from '../../db/client.js';
 import { cartItems, carts, products } from '../../db/schema.js';
-import { badRequest, notFound } from '../../lib/errors.js';
+import { badRequest, notFound, validationError } from '../../lib/errors.js';
+import { NO_SIZE, resolveSize, unavailableReason } from './size-availability.js';
 import type { ProductsService } from '../products/products.service.js';
 
 export class CartService {
@@ -38,7 +39,8 @@ export class CartService {
     let hasUnavailable = false;
 
     const items = rows.map(({ item, product }) => {
-      const available = product.isActive;
+      const reason = unavailableReason(product, item.size);
+      const available = reason === null;
       const lineTotal = product.price * item.quantity;
       if (available) {
         totalQuantity += item.quantity;
@@ -49,8 +51,10 @@ export class CartService {
       return {
         id: item.id,
         productId: product.id,
+        size: item.size === NO_SIZE ? null : item.size,
         quantity: item.quantity,
         available,
+        unavailableReason: reason,
         lineTotal,
         product: this.productsService.toCard(product, images.get(product.id)),
       };
@@ -59,29 +63,37 @@ export class CartService {
     return { items, totalQuantity, totalAmount, hasUnavailable };
   }
 
-  async addItem(userId: number, productId: number, quantity: number): Promise<CartDTO> {
+  async addItem(userId: number, productId: number, quantity: number, size?: string | null): Promise<CartDTO> {
     await this.db.transaction(async (tx) => {
       const [product] = await tx
-        .select({ id: products.id })
+        .select({ id: products.id, sizes: products.sizes })
         .from(products)
         .where(and(eq(products.id, productId), eq(products.isActive, true)));
       if (!product) throw notFound('Товар не найден или снят с продажи');
+
+      // Для товара без размеров переданный размер игнорируется.
+      const resolved = product.sizes.length ? resolveSize(product, size) : NO_SIZE;
+      if (resolved === null) {
+        throw validationError([
+          { path: 'size', message: size ? `Размер ${size} недоступен` : 'Выберите размер' },
+        ]);
+      }
 
       const cartId = await this.getOrCreateCartId(tx, userId);
       const [positions] = await tx.select({ n: count() }).from(cartItems).where(eq(cartItems.cartId, cartId));
       const [already] = await tx
         .select({ id: cartItems.id })
         .from(cartItems)
-        .where(and(eq(cartItems.cartId, cartId), eq(cartItems.productId, productId)));
+        .where(and(eq(cartItems.cartId, cartId), eq(cartItems.productId, productId), eq(cartItems.size, resolved)));
       if (!already && (positions?.n ?? 0) >= LIMITS.cartMaxPositions) {
         throw badRequest(`В корзине может быть не более ${LIMITS.cartMaxPositions} разных товаров`);
       }
 
       await tx
         .insert(cartItems)
-        .values({ cartId, productId, quantity })
+        .values({ cartId, productId, size: resolved, quantity })
         .onConflictDoUpdate({
-          target: [cartItems.cartId, cartItems.productId],
+          target: [cartItems.cartId, cartItems.productId, cartItems.size],
           set: { quantity: sql`least(${cartItems.quantity} + ${quantity}, ${LIMITS.cartItemMaxQuantity})` },
         });
       await tx.update(carts).set({ updatedAt: new Date() }).where(eq(carts.id, cartId));

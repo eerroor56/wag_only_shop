@@ -25,6 +25,7 @@ import {
 } from '@wag/web';
 import { uploadImage, useAdminProduct, useDeleteProduct, useSaveProduct } from '../api/queries';
 import { PageHeader } from '../components/common';
+import { SizesEditor } from '../components/SizesEditor';
 
 interface FormState {
   title: string;
@@ -34,6 +35,7 @@ interface FormState {
   discountPercent: string;
   isActive: boolean;
   attributes: { key: number; name: string; value: string }[];
+  sizes: string[];
 }
 
 interface PendingUpload {
@@ -52,6 +54,7 @@ const EMPTY: FormState = {
   discountPercent: '',
   isActive: true,
   attributes: [],
+  sizes: [],
 };
 
 let keySeq = 1;
@@ -65,6 +68,7 @@ function fromProduct(p: AdminProductDTO): FormState {
     discountPercent: p.discountPercent != null ? String(p.discountPercent) : '',
     isActive: p.isActive,
     attributes: p.attributes.map((a) => ({ key: keySeq++, ...a })),
+    sizes: p.sizes,
   };
 }
 
@@ -95,13 +99,14 @@ function toPayload(
     attributes: form.attributes
       .map(({ name, value }) => ({ name: name.trim(), value: value.trim() }))
       .filter((a) => a.name || a.value),
+    sizes: form.sizes,
     imageIds: images.map((i) => i.id),
     mainImageId: mainImageId ?? images[0]?.id ?? null,
   };
   const parsed = productCreateSchema.safeParse(candidate);
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
-      const path = issue.path[0] === 'attributes' ? 'attributes' : String(issue.path[0]);
+      const path = String(issue.path[0]);
       errors[path] ??= issue.message;
     }
     return { data: null, errors };
@@ -472,6 +477,9 @@ export function ProductEditorPage() {
             </div>
           )}
         </section>
+
+        {/* --------------------------------------------------- Размеры */}
+        <SizesEditor value={form.sizes} onChange={(sizes) => set('sizes', sizes)} error={errors.sizes} />
 
         {/* --------------------------------------------------- Описание */}
         <label className="field">

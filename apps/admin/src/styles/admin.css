@@ -854,3 +854,75 @@ body:has(.tabbar) {
 .center {
   text-align: center;
 }
+
+/* ------------------------------------------------------------ размеры */
+
+.sizes-editor {
+  gap: 10px;
+}
+
+.size-chips,
+.chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.size-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 4px 0 12px;
+  border-radius: 16px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.size-chip button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.size-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.size-custom {
+  display: flex;
+  gap: 8px;
+}
+
+.size-custom .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.size-custom .btn {
+  flex-shrink: 0;
+  min-height: 48px;
+}
+
+.order-item-size {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  vertical-align: middle;
+}

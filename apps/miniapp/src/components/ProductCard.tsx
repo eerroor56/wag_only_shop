@@ -13,6 +13,7 @@ export function ProductCard({ product, eager = false }: { product: ProductCardDT
       <div className="product-card-body">
         <div className="product-card-title line-clamp-2">{product.title}</div>
         <PriceView price={product.price} oldPrice={product.oldPrice} discountPercent={null} size="sm" />
+        {product.sizes.length > 0 && <div className="product-card-sizes">{product.sizes.join(' · ')}</div>}
       </div>
     </Link>
   );

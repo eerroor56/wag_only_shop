@@ -21,16 +21,19 @@ function CartRow({ item }: { item: CartItemDTO }) {
   const update = useUpdateCartItem();
   const remove = useRemoveCartItem();
   const productLink = `/product/${item.productId}?from=cart`;
+  // Скрытый товар открыть нельзя; при проблеме с размером карточка доступна — можно выбрать другой.
+  const linkable = item.unavailableReason !== 'hidden';
+  const label = item.size ? `«${item.product.title}», размер ${item.size}` : `«${item.product.title}»`;
 
   const onRemove = async () => {
-    if (!(await confirmDialog(`Удалить «${item.product.title}» из корзины?`))) return;
+    if (!(await confirmDialog(`Удалить ${label} из корзины?`))) return;
     haptic.impact('medium');
     remove.mutate(item.id, { onError: (err) => toast.error(errorMessage(err)) });
   };
 
   return (
     <li className={`cart-row ${item.available ? '' : 'is-unavailable'}`}>
-      {item.available ? (
+      {linkable ? (
         <Link to={productLink} className="cart-row-media">
           <ProductImage src={item.product.image?.thumbUrl} alt={item.product.title} />
         </Link>
@@ -41,7 +44,7 @@ function CartRow({ item }: { item: CartItemDTO }) {
       )}
       <div className="cart-row-body">
         <div className="cart-row-top">
-          {item.available ? (
+          {linkable ? (
             <Link to={productLink} className="cart-row-title line-clamp-2">
               {item.product.title}
             </Link>
@@ -52,6 +55,7 @@ function CartRow({ item }: { item: CartItemDTO }) {
             <Trash2 size={18} strokeWidth={1.7} />
           </button>
         </div>
+        {item.size && <div className="cart-row-size">Размер: {item.size}</div>}
 
         {item.available ? (
           <>
@@ -71,7 +75,11 @@ function CartRow({ item }: { item: CartItemDTO }) {
             </div>
           </>
         ) : (
-          <div className="cart-row-unavailable">Товар больше недоступен — удалите его, чтобы оформить заказ</div>
+          <div className="cart-row-unavailable">
+            {item.unavailableReason === 'size'
+              ? 'Этого размера больше нет — удалите позицию и выберите другой размер'
+              : 'Товар больше недоступен — удалите его, чтобы оформить заказ'}
+          </div>
         )}
       </div>
     </li>
