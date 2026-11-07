@@ -1,0 +1,32 @@
+{
+  "name": "wag-shop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "WAG Shop — Telegram Mini App магазина брендовых вещей",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @wag/server",
+    "dev:miniapp": "npm run dev -w @wag/miniapp",
+    "dev:admin": "npm run dev -w @wag/admin",
+    "dev:init-data": "npm run dev:init-data -w @wag/server --",
+    "build": "npm run build -w @wag/miniapp && npm run build -w @wag/admin && npm run build -w @wag/server",
+    "start": "npm run start -w @wag/server",
+    "db:generate": "npm run db:generate -w @wag/server",
+    "db:migrate": "npm run db:migrate -w @wag/server",
+    "db:seed": "npm run db:seed -w @wag/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @wag/server"
+  },
+  "allowScripts": {
+    "esbuild@0.18.20": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true
+  }
+}

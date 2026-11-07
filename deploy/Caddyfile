@@ -1,0 +1,11 @@
+# Caddy автоматически получает и продлевает TLS-сертификат для DOMAIN.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Ограничение размера тела запроса (загрузка фото — до 10 МБ)
+	request_body {
+		max_size 12MB
+	}
+
+	reverse_proxy app:3000
+}

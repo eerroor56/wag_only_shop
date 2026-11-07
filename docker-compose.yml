@@ -1,0 +1,62 @@
+# Production: PostgreSQL + приложение + Caddy (автоматический HTTPS от Let's Encrypt).
+#
+#   1. cp .env.example .env  и заполните значения (DOMAIN, BOT_TOKEN, ADMIN_TELEGRAM_IDS, WEBHOOK_SECRET, POSTGRES_PASSWORD)
+#   2. docker compose up -d --build
+#   3. docker compose exec app node apps/server/dist/seed.js   (необязательно: демо-товары)
+
+# Фиксированное имя проекта: одинаковые имена volumes (wag-shop_pgdata, wag-shop_uploads) в любой папке.
+name: wag-shop
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wag_shop
+      POSTGRES_USER: wag
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Укажите POSTGRES_PASSWORD в .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U wag -d wag_shop']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://wag:${POSTGRES_PASSWORD}@db:5432/wag_shop
+      PUBLIC_URL: https://${DOMAIN:?Укажите DOMAIN в .env}
+      UPLOAD_DIR: /data/uploads
+      TRUST_PROXY: 'true'
+      BOT_MODE: webhook
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:

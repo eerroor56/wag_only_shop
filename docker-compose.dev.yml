@@ -1,0 +1,19 @@
+# Только PostgreSQL для локальной разработки:
+#   docker compose -f docker-compose.dev.yml up -d
+# DATABASE_URL=postgres://wag:wag_password@localhost:5432/wag_shop
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wag_shop
+      POSTGRES_USER: wag
+      POSTGRES_PASSWORD: wag_password
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+
+volumes:
+  pgdata_dev:

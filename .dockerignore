@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+.env
+.env.*
+!.env.example
+**/.env.development.local
+apps/server/uploads
+.tmp
+.git
+.claude
+coverage
+*.log
