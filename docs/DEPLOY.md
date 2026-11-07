@@ -82,26 +82,15 @@ docker --version && docker compose version
 
 ## 4. Код проекта
 
-Репозиторий приватный, поэтому серверу нужен ключ только для чтения (deploy key):
-
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/wag_deploy -N "" -C "wag-shop-server"
+git clone https://github.com/eerroor56/wag_only_shop.git /opt/wag-shop && cd /opt/wag-shop
 ```
 
-```bash
-cat ~/.ssh/wag_deploy.pub
-```
-
-Скопируйте вывод в GitHub → репозиторий → **Settings → Deploy keys → Add deploy key** (без галочки
-«Allow write access»). Затем:
-
-```bash
-printf 'Host github.com\n  IdentityFile ~/.ssh/wag_deploy\n  IdentitiesOnly yes\n' >> ~/.ssh/config
-```
-
-```bash
-git clone git@github.com:eerroor56/wag_only_shop.git /opt/wag-shop && cd /opt/wag-shop
-```
+> Если позже сделаете репозиторий приватным, серверу понадобится ключ только для чтения:
+> `ssh-keygen -t ed25519 -f ~/.ssh/wag_deploy -N ""`, публичную часть (`~/.ssh/wag_deploy.pub`)
+> добавьте в GitHub → **Settings → Deploy keys** без права записи, затем
+> `printf 'Host github.com\n  IdentityFile ~/.ssh/wag_deploy\n' >> ~/.ssh/config` и
+> `git -C /opt/wag-shop remote set-url origin git@github.com:eerroor56/wag_only_shop.git`.
 
 ## 5. Настройка `.env`
 
