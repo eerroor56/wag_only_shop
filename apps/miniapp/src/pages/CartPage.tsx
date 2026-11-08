@@ -67,6 +67,7 @@ function CartRow({ item }: { item: CartItemDTO }) {
               <QuantityStepper
                 size="sm"
                 value={item.quantity}
+                max={item.maxQuantity}
                 onChange={(quantity) =>
                   update.mutate({ itemId: item.id, quantity }, { onError: (err) => toast.error(errorMessage(err)) })
                 }
@@ -76,9 +77,32 @@ function CartRow({ item }: { item: CartItemDTO }) {
           </>
         ) : (
           <div className="cart-row-unavailable">
-            {item.unavailableReason === 'size'
-              ? 'Этого размера больше нет — удалите позицию и выберите другой размер'
-              : 'Товар больше недоступен — удалите его, чтобы оформить заказ'}
+            {item.unavailableReason === 'stock' && item.maxQuantity != null ? (
+              <>
+                <span>
+                  В наличии только {item.maxQuantity} шт. — в корзине {item.quantity}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={update.isPending}
+                  onClick={() =>
+                    update.mutate(
+                      { itemId: item.id, quantity: item.maxQuantity! },
+                      { onError: (err) => toast.error(errorMessage(err)) },
+                    )
+                  }
+                >
+                  Оставить {item.maxQuantity} шт.
+                </button>
+              </>
+            ) : item.unavailableReason === 'soldout' ? (
+              'Товар закончился — удалите его, чтобы оформить заказ'
+            ) : item.unavailableReason === 'size' ? (
+              'Этого размера больше нет — удалите позицию и выберите другой размер'
+            ) : (
+              'Товар больше недоступен — удалите его, чтобы оформить заказ'
+            )}
           </div>
         )}
       </div>
@@ -160,7 +184,7 @@ export function CartPage() {
           <span>Итого:</span>
           <span className="checkout-total-value">{formatPrice(cart.totalAmount)}</span>
         </div>
-        {cart.hasUnavailable && <div className="field-error">Удалите недоступные товары, чтобы продолжить</div>}
+        {cart.hasUnavailable && <div className="field-error">Исправьте недоступные позиции, чтобы продолжить</div>}
         <button
           type="button"
           className="btn btn-primary btn-lg btn-block"

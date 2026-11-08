@@ -21,6 +21,8 @@ interface DemoProduct {
   discountPercent?: number;
   attributes: { name: string; value: string }[];
   sizes?: string[];
+  /** Остатки по размерам (или { '': n } без размеров); не задано — не учитываются. */
+  stock?: Record<string, number>;
   category: string;
   shades: string[];
 }
@@ -40,6 +42,7 @@ const DEMO: DemoProduct[] = [
       { name: 'Цвет', value: 'Чёрный' },
     ],
     sizes: ['S', 'M', 'L', 'XL'],
+    stock: { S: 2, M: 5, L: 0, XL: 1 },
     category: 'Худи',
     shades: ['#1c1c1e', '#2c2c2e', '#3a3a3c'],
   },
@@ -66,6 +69,7 @@ const DEMO: DemoProduct[] = [
       { name: 'Страна', value: 'Италия' },
     ],
     sizes: ['46', '48', '50', '52', '54'],
+    stock: { 46: 0, 48: 0, 50: 0, 52: 0, 54: 0 },
     category: 'Верхняя одежда',
     shades: ['#48484a', '#636366', '#3a3a3c', '#2c2c2e'],
   },
@@ -88,6 +92,7 @@ const DEMO: DemoProduct[] = [
     oldPrice: rub(31_990),
     attributes: [{ name: 'Бренд', value: 'New Balance' }],
     sizes: ['41', '42', '43', '44'],
+    stock: { 41: 1, 42: 3, 43: 2, 44: 0 },
     category: 'Кроссовки',
     shades: ['#aeaeb2', '#8e8e93', '#c7c7cc'],
   },
@@ -160,6 +165,8 @@ async function main() {
           discountPercent: demo.discountPercent ?? null,
           attributes: demo.attributes,
           sizes: demo.sizes ?? [],
+          stock: demo.stock ?? null,
+          stockTotal: demo.stock ? Object.values(demo.stock).reduce((a, b) => a + b, 0) : null,
           categoryId: categoryIds.get(demo.category)!,
           sortOrder: i,
         })

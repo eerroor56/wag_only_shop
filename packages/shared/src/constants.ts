@@ -10,6 +10,8 @@ export const LIMITS = {
   productImagesMax: 15,
   productSizesMax: 30,
   categoryNameMax: 40,
+  /** Максимальный остаток одного размера. */
+  stockMax: 99_999,
   categoriesMax: 100,
   imageMaxBytes: 10 * 1024 * 1024,
   customerNameMax: 100,

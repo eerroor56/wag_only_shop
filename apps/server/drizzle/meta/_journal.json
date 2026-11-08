@@ -22,6 +22,13 @@
       "when": 1794152894147,
       "tag": "0002_product_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794165382808,
+      "tag": "0003_product_stock",
+      "breakpoints": true
     }
   ]
 }

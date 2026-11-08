@@ -13,6 +13,7 @@ import {
   useToast,
   ApiError,
 } from '@wag/web';
+import { availableStock, LOW_STOCK_THRESHOLD } from '@wag/shared';
 import { useAddToCart, useCart, useProduct, useUpdateCartItem } from '../api/queries';
 import { Gallery } from '../components/Gallery';
 import { QuantityStepper } from '../components/QuantityStepper';
@@ -49,15 +50,25 @@ export function ProductPage() {
   const [pickedSize, setPickedSize] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState(false);
   const sizes = product?.sizes ?? [];
+  const stock = product?.stock ?? null;
+  const sizeSoldOut = (s: string) => availableStock(stock, s) === 0;
   // Единственный размер выбираем автоматически.
   const selectedSize = sizes.length === 1 ? sizes[0]! : pickedSize && sizes.includes(pickedSize) ? pickedSize : null;
   const needsSize = sizes.length > 0 && selectedSize === null;
+  /** Остаток выбранного размера (или товара без размеров); null — без ограничений или размер не выбран. */
+  const available = sizes.length
+    ? selectedSize
+      ? availableStock(stock, selectedSize)
+      : null
+    : availableStock(stock, null);
+  const soldOut = Boolean(product?.soldOut) || available === 0;
 
   const cartItem = cart?.items.find(
     (i) => i.productId === productId && i.available && (i.size ?? null) === (sizes.length ? selectedSize : null),
   );
 
   const onAdd = () => {
+    if (soldOut) return;
     if (needsSize) {
       setSizeError(true);
       haptic.notify('error');
@@ -153,7 +164,9 @@ export function ProductPage() {
                   type="button"
                   role="radio"
                   aria-checked={selectedSize === s}
-                  className="size-option"
+                  aria-label={sizeSoldOut(s) ? `${s} — нет в наличии` : s}
+                  className={`size-option ${sizeSoldOut(s) ? 'is-soldout' : ''}`}
+                  disabled={sizeSoldOut(s) && sizes.length > 1}
                   onClick={() => {
                     setPickedSize(s);
                     setSizeError(false);
@@ -165,6 +178,15 @@ export function ProductPage() {
               ))}
             </div>
           </section>
+        )}
+
+        {soldOut ? (
+          <div className="stock-note is-out">
+            {product.soldOut ? 'Нет в наличии' : `Размер ${selectedSize} закончился — выберите другой`}
+          </div>
+        ) : (
+          available != null &&
+          available <= LOW_STOCK_THRESHOLD && <div className="stock-note">Осталось {available} шт.</div>
         )}
 
         {product.description && <p className="product-description">{product.description}</p>}
@@ -190,6 +212,7 @@ export function ProductPage() {
           <>
             <QuantityStepper
               value={cartItem.quantity}
+              max={cartItem.maxQuantity}
               onChange={(quantity) =>
                 updateItem.mutate(
                   { itemId: cartItem.id, quantity },
@@ -206,10 +229,12 @@ export function ProductPage() {
             type="button"
             className="btn btn-primary btn-lg btn-block"
             onClick={onAdd}
-            disabled={addToCart.isPending}
+            disabled={addToCart.isPending || soldOut}
           >
             {addToCart.isPending ? (
               <Spinner size={18} />
+            ) : soldOut ? (
+              'Нет в наличии'
             ) : needsSize ? (
               'Выберите размер'
             ) : selectedSize && sizes.length > 1 ? (

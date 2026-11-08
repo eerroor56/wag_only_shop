@@ -12,7 +12,8 @@ import type { Database } from '../../db/client.js';
 import { cartItems, carts, orderItems, orders, products, users, type Order, type OrderItem, type User } from '../../db/schema.js';
 import { AppError, badRequest, conflict, notFound, validationError } from '../../lib/errors.js';
 import { escapeLike } from '../../lib/format.js';
-import { NO_SIZE, resolveSize, unavailableReason } from '../cart/size-availability.js';
+import { maxQuantityFor, NO_SIZE, resolveSize, unavailableReason } from '../cart/size-availability.js';
+import { applyStockChanges, describeShortages } from '../products/stock.js';
 
 export interface CreateOrderResult {
   order: OrderDTO;
@@ -103,12 +104,19 @@ export class OrdersService {
           .orderBy(asc(cartItems.createdAt), asc(cartItems.id));
 
         if (!rows.length) throw new AppError(400, 'CART_EMPTY', 'Корзина пуста');
-        const unavailable = rows.filter((r) => unavailableReason(r.product, r.item.size) !== null);
+        const unavailable = rows
+          .map((r) => ({ ...r, reason: unavailableReason(r.product, r.item.size, r.item.quantity) }))
+          .filter((r) => r.reason !== null);
         if (unavailable.length) {
-          const names = unavailable.map((r) => (r.item.size ? `${r.product.title} (${r.item.size})` : r.product.title));
+          const names = unavailable.map(({ item, product, reason }) => {
+            const name = item.size ? `${product.title} (${item.size})` : product.title;
+            if (reason === 'soldout') return `${name} — закончился`;
+            if (reason === 'stock') return `${name} — осталось ${maxQuantityFor(product, item.size)} шт.`;
+            return name;
+          });
           throw conflict(
             'CART_HAS_UNAVAILABLE',
-            `Некоторые позиции больше недоступны: ${names.join(', ')}. Удалите их из корзины.`,
+            `Некоторые позиции недоступны: ${names.join(', ')}. Обновите корзину.`,
           );
         }
 
@@ -139,6 +147,15 @@ export class OrdersService {
             idempotencyKey: input.idempotencyKey,
           })
           .returning({ id: orders.id });
+
+        // Списание остатков под блокировкой товаров: параллельные заказы не уведут остаток в минус.
+        const shortages = await applyStockChanges(
+          tx,
+          lines.map((l) => ({ productId: l.productId, size: l.sizeSnapshot, delta: -l.quantity })),
+        );
+        if (shortages.length) {
+          throw conflict('OUT_OF_STOCK', `Товара не хватает: ${describeShortages(shortages)}. Обновите корзину.`);
+        }
 
         await tx.insert(orderItems).values(lines.map((l) => ({ ...l, orderId: order!.id })));
         await tx.delete(cartItems).where(eq(cartItems.cartId, cart.id));
@@ -239,9 +256,32 @@ export class OrdersService {
     return toAdminOrderDTO(row.order, items, row.user);
   }
 
+  /**
+   * Смена статуса. Отмена возвращает товары на склад; восстановление отменённого заказа
+   * списывает их снова (409, если товара уже не хватает).
+   */
   async updateStatus(id: number, status: OrderStatus): Promise<AdminOrderDTO> {
-    const updated = await this.db.update(orders).set({ status }).where(eq(orders.id, id)).returning({ id: orders.id });
-    if (!updated.length) throw notFound('Заказ не найден');
+    await this.db.transaction(async (tx) => {
+      const [order] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, id)).for('update');
+      if (!order) throw notFound('Заказ не найден');
+      const wasCancelled = order.status === 'cancelled';
+      const willBeCancelled = status === 'cancelled';
+      if (wasCancelled !== willBeCancelled) {
+        const items = await tx
+          .select({ productId: orderItems.productId, size: orderItems.sizeSnapshot, quantity: orderItems.quantity })
+          .from(orderItems)
+          .where(eq(orderItems.orderId, id));
+        const sign = willBeCancelled ? 1 : -1;
+        const shortages = await applyStockChanges(
+          tx,
+          items.map((i) => ({ productId: i.productId, size: i.size, delta: sign * i.quantity })),
+        );
+        if (shortages.length) {
+          throw conflict('OUT_OF_STOCK', `Нельзя восстановить заказ — не хватает товара: ${describeShortages(shortages)}`);
+        }
+      }
+      await tx.update(orders).set({ status }).where(eq(orders.id, id));
+    });
     return this.adminGet(id);
   }
 }

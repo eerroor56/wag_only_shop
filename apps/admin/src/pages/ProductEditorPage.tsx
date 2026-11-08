@@ -27,6 +27,7 @@ import { uploadImage, useAdminProduct, useDeleteProduct, useSaveProduct } from '
 import { PageHeader } from '../components/common';
 import { CategoryPicker } from '../components/CategoryPicker';
 import { SizesEditor } from '../components/SizesEditor';
+import { parseStockDraft, StockEditor, type StockDraft } from '../components/StockEditor';
 
 interface FormState {
   title: string;
@@ -40,6 +41,9 @@ interface FormState {
   attributes: { key: number; name: string; value: string }[];
   sizes: string[];
   categoryId: number | null;
+  /** Переключатель «Учитывать остатки». */
+  trackStock: boolean;
+  stock: StockDraft;
 }
 
 interface PendingUpload {
@@ -61,6 +65,8 @@ const EMPTY: FormState = {
   attributes: [],
   sizes: [],
   categoryId: null,
+  trackStock: false,
+  stock: {},
 };
 
 let keySeq = 1;
@@ -77,6 +83,8 @@ function fromProduct(p: AdminProductDTO): FormState {
     attributes: p.attributes.map((a) => ({ key: keySeq++, ...a })),
     sizes: p.sizes,
     categoryId: p.categoryId,
+    trackStock: p.stock != null,
+    stock: Object.fromEntries(Object.entries(p.stock ?? {}).map(([k, v]) => [k, String(v)])),
   };
 }
 
@@ -102,6 +110,8 @@ function toPayload(
       errors.discountPercent = 'Скидка — целое число от 1 до 99';
     }
   }
+  const stock = form.trackStock ? parseStockDraft(form.sizes, form.stock) : null;
+  if (form.trackStock && stock == null) errors.stock = `Остаток — целое число от 0 до ${LIMITS.stockMax}`;
   if (Object.keys(errors).length) return { data: null, errors };
 
   const candidate = {
@@ -116,6 +126,7 @@ function toPayload(
       .filter((a) => a.name || a.value),
     sizes: form.sizes,
     categoryId: form.categoryId,
+    stock,
     imageIds: images.map((i) => i.id),
     mainImageId: mainImageId ?? images[0]?.id ?? null,
   };
@@ -527,6 +538,19 @@ export function ProductEditorPage() {
 
         {/* --------------------------------------------------- Размеры */}
         <SizesEditor value={form.sizes} onChange={(sizes) => set('sizes', sizes)} error={errors.sizes} />
+
+        {/* --------------------------------------------------- Наличие */}
+        <StockEditor
+          sizes={form.sizes}
+          enabled={form.trackStock}
+          draft={form.stock}
+          onToggle={(on) => set('trackStock', on)}
+          onChange={(stock) => {
+            set('stock', stock);
+            setErrors((e) => ({ ...e, stock: '' }));
+          }}
+          error={errors.stock}
+        />
 
         {/* --------------------------------------------------- Описание */}
         <label className="field">

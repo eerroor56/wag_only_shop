@@ -47,6 +47,10 @@ export interface ProductCardDTO {
   image: ImageDTO | null;
   /** Доступные размеры (пусто — без размера). */
   sizes: string[];
+  /** Остатки по размерам ({ "": n } — без размеров); null — не учитываются, товар всегда в наличии. */
+  stock: Record<string, number> | null;
+  /** Все размеры закончились. */
+  soldOut: boolean;
 }
 
 /** Категория в каталоге покупателя: только непустые, productsCount — товары в продаже. */
@@ -87,8 +91,13 @@ export interface CartItemDTO {
   quantity: number;
   /** false — оформить позицию нельзя (см. unavailableReason). */
   available: boolean;
-  /** hidden — товар скрыт; size — выбранного размера больше нет или нужно выбрать размер. */
-  unavailableReason: 'hidden' | 'size' | null;
+  /**
+   * hidden — товар скрыт; size — выбранного размера больше нет; soldout — закончился;
+   * stock — в наличии меньше, чем в корзине (см. maxQuantity).
+   */
+  unavailableReason: 'hidden' | 'size' | 'soldout' | 'stock' | null;
+  /** Сколько штук этой позиции можно купить; null — без ограничений. */
+  maxQuantity: number | null;
   lineTotal: number;
   product: ProductCardDTO;
 }
@@ -144,6 +153,9 @@ export interface AdminProductDTO {
   effectiveDiscountPercent: number | null;
   attributes: ProductAttribute[];
   sizes: string[];
+  /** null — остатки не учитываются. */
+  stock: Record<string, number> | null;
+  stockTotal: number | null;
   categoryId: number | null;
   isActive: boolean;
   sortOrder: number;

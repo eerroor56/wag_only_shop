@@ -95,6 +95,20 @@ export const products = pgTable(
     attributes: jsonb('attributes').$type<ProductAttribute[]>().notNull().default([]),
     /** Доступные размеры в порядке отображения (M, 48, 48-52, 52/54…). Пусто — товар без размера. */
     sizes: text('sizes').array().notNull().default(sql`'{}'::text[]`),
+    /**
+     * Остатки по размерам: { "M": 3, "L": 0 }; у товара без размеров — { "": 5 }.
+     * null — остатки не учитываются (товар всегда в наличии).
+     */
+    stock: jsonb('stock').$type<Record<string, number>>(),
+    /** Сумма остатков (для сортировки и фильтра «в наличии»); null — не учитываются. Пересчитывается вместе со stock. */
+    stockTotal: integer('stock_total'),
+    /**
+     * Ключ сортировки и поиска по названию: нижний регистр, ё → е. Кириллица переводится явно через translate —
+     * lower() зависит от локали кластера и в локали C её не понижает.
+     */
+    titleSort: text('title_sort').generatedAlwaysAs(
+      sql`lower(translate(title, 'ЁёАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ', 'ееабвгдежзийклмнопрстуфхцчшщъыьэюя'))`,
+    ),
     /** Категория; при удалении категории товары остаются без неё. */
     categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
     isActive: boolean('is_active').notNull().default(true),
@@ -106,6 +120,7 @@ export const products = pgTable(
     index('products_catalog_idx').on(t.isActive, t.sortOrder, t.id),
     index('products_category_idx').on(t.categoryId, t.isActive, t.sortOrder),
     check('products_price_check', sql`${t.price} >= 0`),
+    check('products_stock_total_check', sql`${t.stockTotal} IS NULL OR ${t.stockTotal} >= 0`),
     check('products_old_price_check', sql`${t.oldPrice} IS NULL OR ${t.oldPrice} > ${t.price}`),
     check(
       'products_discount_check',

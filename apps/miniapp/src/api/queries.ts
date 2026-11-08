@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   QueryClient,
   useInfiniteQuery,
   useMutation,
@@ -7,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 import type {
   CartDTO,
+  CatalogSort,
   CategoryDTO,
   CheckoutInput,
   MeDTO,
@@ -32,7 +34,8 @@ export const keys = {
   config: ['config'] as const,
   me: ['me'] as const,
   categories: ['categories'] as const,
-  products: (categoryId: number | null) => ['products', categoryId ?? 'all'] as const,
+  products: (f: CatalogFilters) => ['products', f.categoryId ?? 'all', f.sort, f.q, f.inStock] as const,
+  search: (q: string) => ['product-search', q] as const,
   product: (id: number) => ['product', id] as const,
   cart: ['cart'] as const,
   order: (id: number) => ['order', id] as const,
@@ -63,16 +66,43 @@ export function useCategories() {
   });
 }
 
-export function useCatalog(categoryId: number | null) {
+export interface CatalogFilters {
+  categoryId: number | null;
+  sort: CatalogSort;
+  /** Поиск по названию (уже без лишних пробелов). */
+  q: string;
+  inStock: boolean;
+}
+
+function catalogParams(f: Partial<CatalogFilters>, limit: number, offset = 0): URLSearchParams {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (f.categoryId != null) params.set('categoryId', String(f.categoryId));
+  if (f.sort && f.sort !== 'default') params.set('sort', f.sort);
+  if (f.q) params.set('q', f.q);
+  if (f.inStock) params.set('inStock', '1');
+  return params;
+}
+
+export function useCatalog(filters: CatalogFilters) {
   return useInfiniteQuery({
-    queryKey: keys.products(categoryId),
+    queryKey: keys.products(filters),
     initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) => {
-      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(pageParam) });
-      if (categoryId != null) params.set('categoryId', String(categoryId));
-      return api.get<ProductsPageDTO>(`/api/products?${params}`, signal);
-    },
+    queryFn: ({ pageParam, signal }) =>
+      api.get<ProductsPageDTO>(`/api/products?${catalogParams(filters, PAGE_SIZE, pageParam)}`, signal),
     getNextPageParam: (last) => last.nextOffset ?? undefined,
+    // Пока грузятся результаты нового фильтра, на экране остаются прежние — без мигания скелетона.
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Подсказки поиска: первые совпадения по названию во всём каталоге (закончившиеся — в конце). */
+export function useSearchSuggestions(q: string) {
+  return useQuery({
+    queryKey: keys.search(q),
+    queryFn: ({ signal }) => api.get<ProductsPageDTO>(`/api/products?${catalogParams({ q }, 6)}`, signal),
+    enabled: q.length > 0,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -96,7 +126,13 @@ export function useCart() {
 function recalc(cart: CartDTO): CartDTO {
   let totalQuantity = 0;
   let totalAmount = 0;
-  const items = cart.items.map((i) => {
+  const items = cart.items.map((raw) => {
+    // Позиция «больше, чем в наличии» становится доступной, как только количество уменьшили до остатка.
+    const fits = raw.maxQuantity == null || raw.quantity <= raw.maxQuantity;
+    const i =
+      raw.maxQuantity != null && (raw.unavailableReason === null || raw.unavailableReason === 'stock')
+        ? { ...raw, available: fits, unavailableReason: fits ? null : ('stock' as const) }
+        : raw;
     const lineTotal = i.product.price * i.quantity;
     if (i.available) {
       totalQuantity += i.quantity;

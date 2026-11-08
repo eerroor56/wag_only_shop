@@ -2,8 +2,8 @@ import { and, asc, count, eq, sql } from 'drizzle-orm';
 import { LIMITS, type CartDTO } from '@wag/shared';
 import type { Database, DbExecutor } from '../../db/client.js';
 import { cartItems, carts, products } from '../../db/schema.js';
-import { badRequest, notFound, validationError } from '../../lib/errors.js';
-import { NO_SIZE, resolveSize, unavailableReason } from './size-availability.js';
+import { badRequest, conflict, notFound, validationError } from '../../lib/errors.js';
+import { maxQuantityFor, NO_SIZE, resolveSize, stockLimitMessage, unavailableReason } from './size-availability.js';
 import type { ProductsService } from '../products/products.service.js';
 
 export class CartService {
@@ -23,7 +23,10 @@ export class CartService {
     return existing!.id;
   }
 
-  /** Корзина с актуальными ценами из БД. Скрытые товары помечаются как недоступные и не входят в сумму. */
+  /**
+   * Корзина с актуальными ценами и остатками из БД. Скрытые, закончившиеся позиции и позиции,
+   * которых в корзине больше, чем в наличии, помечаются недоступными и не входят в сумму.
+   */
   async getCart(userId: number, db: DbExecutor = this.db): Promise<CartDTO> {
     const rows = await db
       .select({ item: cartItems, product: products })
@@ -39,7 +42,7 @@ export class CartService {
     let hasUnavailable = false;
 
     const items = rows.map(({ item, product }) => {
-      const reason = unavailableReason(product, item.size);
+      const reason = unavailableReason(product, item.size, item.quantity);
       const available = reason === null;
       const lineTotal = product.price * item.quantity;
       if (available) {
@@ -55,6 +58,7 @@ export class CartService {
         quantity: item.quantity,
         available,
         unavailableReason: reason,
+        maxQuantity: maxQuantityFor(product, item.size),
         lineTotal,
         product: this.productsService.toCard(product, images.get(product.id)),
       };
@@ -66,7 +70,7 @@ export class CartService {
   async addItem(userId: number, productId: number, quantity: number, size?: string | null): Promise<CartDTO> {
     await this.db.transaction(async (tx) => {
       const [product] = await tx
-        .select({ id: products.id, sizes: products.sizes })
+        .select({ id: products.id, title: products.title, sizes: products.sizes, stock: products.stock })
         .from(products)
         .where(and(eq(products.id, productId), eq(products.isActive, true)));
       if (!product) throw notFound('Товар не найден или снят с продажи');
@@ -82,11 +86,15 @@ export class CartService {
       const cartId = await this.getOrCreateCartId(tx, userId);
       const [positions] = await tx.select({ n: count() }).from(cartItems).where(eq(cartItems.cartId, cartId));
       const [already] = await tx
-        .select({ id: cartItems.id })
+        .select({ id: cartItems.id, quantity: cartItems.quantity })
         .from(cartItems)
         .where(and(eq(cartItems.cartId, cartId), eq(cartItems.productId, productId), eq(cartItems.size, resolved)));
       if (!already && (positions?.n ?? 0) >= LIMITS.cartMaxPositions) {
         throw badRequest(`В корзине может быть не более ${LIMITS.cartMaxPositions} разных товаров`);
+      }
+      const max = maxQuantityFor(product, resolved);
+      if (max !== null && (already?.quantity ?? 0) + quantity > max) {
+        throw conflict('OUT_OF_STOCK', stockLimitMessage(product.title, resolved, max));
       }
 
       await tx
@@ -102,6 +110,22 @@ export class CartService {
   }
 
   async updateItem(userId: number, itemId: number, quantity: number): Promise<CartDTO> {
+    const [current] = await this.db
+      .select({ size: cartItems.size, title: products.title, sizes: products.sizes, stock: products.stock })
+      .from(cartItems)
+      .innerJoin(products, eq(products.id, cartItems.productId))
+      .where(
+        and(
+          eq(cartItems.id, itemId),
+          sql`${cartItems.cartId} = (SELECT id FROM ${carts} WHERE ${carts.userId} = ${userId})`,
+        ),
+      );
+    if (!current) throw notFound('Позиция корзины не найдена');
+    const max = maxQuantityFor(current, current.size);
+    // Уменьшать количество можно всегда — так пользователь приводит корзину к остатку.
+    if (max !== null && quantity > max) {
+      throw conflict('OUT_OF_STOCK', stockLimitMessage(current.title, current.size, max));
+    }
     const updated = await this.db
       .update(cartItems)
       .set({ quantity })

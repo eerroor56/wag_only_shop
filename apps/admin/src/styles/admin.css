@@ -1294,3 +1294,111 @@ button.cat-row:active:not(:disabled) {
   color: var(--text-3);
   font-weight: 400;
 }
+
+/* ------------------------------------------------------------ stock */
+
+.row-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill-strong {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+.stock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.stock-single {
+  display: flex;
+}
+
+.stock-single .stock-cell {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stock-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  transition:
+    opacity 0.15s,
+    border-color 0.15s;
+}
+
+.stock-cell.is-empty {
+  border-style: dashed;
+}
+
+.stock-grid .stock-cell.is-empty .stock-cell-label {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.stock-cell-label {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.stock-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stock-stepper button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.stock-stepper button:disabled {
+  opacity: 0.35;
+}
+
+.stock-stepper input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 650;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.stock-stepper input:focus {
+  background: var(--surface);
+}
+
+.stock-single .stock-stepper {
+  width: 150px;
+}
+
+.stock-summary b {
+  color: var(--text);
+}

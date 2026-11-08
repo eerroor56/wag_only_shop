@@ -266,6 +266,9 @@ export function useUpdateOrderStatus() {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['admin-orders'] });
       void qc.invalidateQueries({ queryKey: keys.dashboard });
+      // Отмена / восстановление заказа меняет остатки товаров.
+      void qc.invalidateQueries({ queryKey: keys.products });
+      void qc.invalidateQueries({ queryKey: ['admin-product'] });
     },
   });
 }

@@ -3,6 +3,7 @@ import { LIMITS } from './constants.js';
 import { ORDER_STATUSES } from './order-status.js';
 import { normalizePhone } from './phone.js';
 import { normalizeSizeLabel, SIZE_LABEL_MAX, SIZE_LABEL_PATTERN, sizeKey } from './sizes.js';
+import { CATALOG_SORTS } from './stock.js';
 
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
@@ -36,6 +37,16 @@ export const sizesSchema = z
   .array(sizeLabelSchema)
   .max(LIMITS.productSizesMax, `Не более ${LIMITS.productSizesMax} размеров`)
   .refine((list) => new Set(list.map(sizeKey)).size === list.length, 'Размеры повторяются');
+
+// ---------- Остатки ----------
+
+/** Остатки по размерам ({ "M": 3 }, без размеров — { "": 5 }); null — не учитываются. */
+export const stockSchema = z
+  .record(
+    z.string().max(SIZE_LABEL_MAX),
+    z.number().int('Количество — целое число').min(0, 'Количество не может быть отрицательным').max(LIMITS.stockMax, `Не более ${LIMITS.stockMax} шт.`),
+  )
+  .nullable();
 
 // ---------- Корзина ----------
 
@@ -90,6 +101,8 @@ export const productFieldsSchema = z.object({
   attributes: z.array(productAttributeSchema).max(LIMITS.productAttributesMax).default([]),
   /** Доступные размеры в порядке отображения. Пустой список — товар без размера. */
   sizes: sizesSchema.default([]),
+  /** Остатки по размерам; null — не учитываются. Сервер приводит ключи к списку размеров. */
+  stock: stockSchema.default(null),
   /** Категория (группа) товара; null — без категории. */
   categoryId: z.number().int().positive().nullable().default(null),
   isActive: z.boolean().default(true),
@@ -139,6 +152,7 @@ export const productPatchSchema = z.object({
   discountPercent: z.number().int().min(1).max(99).nullable().optional(),
   attributes: z.array(productAttributeSchema).max(LIMITS.productAttributesMax).optional(),
   sizes: sizesSchema.optional(),
+  stock: stockSchema.optional(),
   categoryId: z.number().int().positive().nullable().optional(),
   isActive: z.boolean().optional(),
   imageIds: z.array(z.number().int().positive()).max(LIMITS.productImagesMax).optional(),
@@ -195,6 +209,14 @@ export const productsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
   /** Фильтр каталога по категории. */
   categoryId: z.coerce.number().int().positive().optional(),
+  sort: z.enum(CATALOG_SORTS).catch('default').default('default'),
+  /** Поиск по названию. */
+  q: z.string().trim().max(100).optional(),
+  /** Только товары в наличии. */
+  inStock: z
+    .enum(['1', 'true', '0', 'false'])
+    .optional()
+    .transform((v) => v === '1' || v === 'true'),
 });
 
 // ---------- Рассылка ----------

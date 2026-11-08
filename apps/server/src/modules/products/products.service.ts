@@ -1,7 +1,12 @@
-import { and, asc, count, desc, eq, inArray, isNull, lt, min, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, lt, min, or, sql, type SQL } from 'drizzle-orm';
 import {
   effectiveDiscountPercent,
+  isSoldOut,
+  normalizeStock,
   productRuleIssues,
+  stockTotal,
+  titleSearchKey,
+  type CatalogSort,
   type AdminProductDTO,
   type AdminProductsDTO,
   type AdminImageDTO,
@@ -15,6 +20,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Database, DbExecutor } from '../../db/client.js';
 import { categories, productImages, products, type Product, type ProductImage } from '../../db/schema.js';
 import { badRequest, notFound, validationError } from '../../lib/errors.js';
+import { escapeLike } from '../../lib/format.js';
 import { processProductImage } from '../../storage/image-processor.js';
 import type { StorageDriver } from '../../storage/index.js';
 import type { CategoriesService } from '../categories/categories.service.js';
@@ -41,6 +47,8 @@ export class ProductsService {
       discountPercent: effectiveDiscountPercent(p),
       image: image ? toImageDTO(image, this.storage) : null,
       sizes: p.sizes,
+      stock: p.stock,
+      soldOut: isSoldOut(p.stock),
     };
   }
 
@@ -57,6 +65,8 @@ export class ProductsService {
       effectiveDiscountPercent: effectiveDiscountPercent(p),
       attributes: p.attributes,
       sizes: p.sizes,
+      stock: p.stock,
+      stockTotal: p.stockTotal,
       categoryId: p.categoryId,
       isActive: p.isActive,
       sortOrder: p.sortOrder,
@@ -91,17 +101,38 @@ export class ProductsService {
 
   // ------------------------------------------------------------------ catalog (покупатель)
 
-  async listCatalog(limit: number, offset: number, categoryId?: number): Promise<ProductsPageDTO> {
+  async listCatalog(params: {
+    limit: number;
+    offset: number;
+    categoryId?: number;
+    sort?: CatalogSort;
+    q?: string;
+    inStock?: boolean;
+  }): Promise<ProductsPageDTO> {
+    const { limit, offset } = params;
+    const search = params.q ? titleSearchKey(params.q) : '';
     const where = and(
       eq(products.isActive, true),
-      categoryId !== undefined ? eq(products.categoryId, categoryId) : undefined,
+      params.categoryId !== undefined ? eq(products.categoryId, params.categoryId) : undefined,
+      search ? sql`${products.titleSort} LIKE ${`%${escapeLike(search)}%`}` : undefined,
+      params.inStock ? or(isNull(products.stockTotal), sql`${products.stockTotal} > 0`) : undefined,
     );
+    // Закончившиеся товары — в конце списка при любой сортировке, как на маркетплейсах.
+    const soldOutLast = sql`(coalesce(${products.stockTotal}, 1) = 0)`;
+    const bySort: Record<CatalogSort, SQL[]> = {
+      default: [asc(products.sortOrder)],
+      price_asc: [asc(products.price)],
+      price_desc: [desc(products.price)],
+      title_asc: [sql`${products.titleSort} COLLATE "C" ASC`],
+      title_desc: [sql`${products.titleSort} COLLATE "C" DESC`],
+      new: [desc(products.createdAt)],
+    };
     const [rows, [totalRow]] = await Promise.all([
       this.db
         .select()
         .from(products)
         .where(where)
-        .orderBy(asc(products.sortOrder), desc(products.id))
+        .orderBy(soldOutLast, ...bySort[params.sort ?? 'default'], desc(products.id))
         .limit(limit)
         .offset(offset),
       this.db.select({ n: count() }).from(products).where(where),
@@ -166,6 +197,7 @@ export class ProductsService {
   async create(input: ProductFields): Promise<AdminProductDTO> {
     const id = await this.db.transaction(async (tx) => {
       await this.categories.assertExists(tx, input.categoryId);
+      const stock = normalizeStock(input.sizes, input.stock);
       // Новые товары появляются в начале каталога.
       const [{ minOrder } = { minOrder: null }] = await tx.select({ minOrder: min(products.sortOrder) }).from(products);
       const [created] = await tx
@@ -178,6 +210,8 @@ export class ProductsService {
           discountPercent: input.discountPercent,
           attributes: input.attributes,
           sizes: input.sizes,
+          stock,
+          stockTotal: stockTotal(stock),
           categoryId: input.categoryId,
           isActive: input.isActive,
           sortOrder: (minOrder ?? 1) - 1,
@@ -204,6 +238,7 @@ export class ProductsService {
         discountPercent: patch.discountPercent !== undefined ? patch.discountPercent : current.discountPercent,
         attributes: patch.attributes ?? current.attributes,
         sizes: patch.sizes ?? current.sizes,
+        stock: patch.stock !== undefined ? patch.stock : current.stock,
         categoryId: patch.categoryId !== undefined ? patch.categoryId : current.categoryId,
         isActive: patch.isActive ?? current.isActive,
         imageIds: patch.imageIds ?? sorted.map((i) => i.id),
@@ -212,6 +247,8 @@ export class ProductsService {
       const issues = productRuleIssues(merged);
       if (issues.length) throw validationError(issues);
       if (patch.categoryId !== undefined) await this.categories.assertExists(tx, merged.categoryId);
+      // Остатки всегда приводятся к актуальному списку размеров (удалённый размер — удалённый остаток).
+      const stock = normalizeStock(merged.sizes, merged.stock);
 
       await tx
         .update(products)
@@ -223,6 +260,8 @@ export class ProductsService {
           discountPercent: merged.discountPercent,
           attributes: merged.attributes,
           sizes: merged.sizes,
+          stock,
+          stockTotal: stockTotal(stock),
           categoryId: merged.categoryId,
           isActive: merged.isActive,
         })

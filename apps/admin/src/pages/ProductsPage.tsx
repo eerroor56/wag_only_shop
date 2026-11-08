@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Eye, EyeOff, FolderCog, ImageOff, Package, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Eye, EyeOff, FolderCog, ImageOff, Package, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { formatPrice, type AdminProductDTO } from '@wag/shared';
@@ -7,7 +7,7 @@ import { useAdminCategories, useAdminProducts, usePatchProduct, useReorderProduc
 import { CategorySheet } from '../components/CategoryPicker';
 import { ListSkeleton, PageHeader } from '../components/common';
 
-type Filter = 'all' | 'active' | 'hidden';
+type Filter = 'all' | 'active' | 'hidden' | 'soldout';
 /** all — все товары, none — без категории, число — id категории. */
 type CategoryFilter = 'all' | 'none' | number;
 
@@ -56,8 +56,14 @@ function ProductRow({
             {product.effectiveDiscountPercent != null && <span>−{product.effectiveDiscountPercent}%</span>}
             <span>· {product.images.length} фото</span>
             {product.sizes.length > 0 && <span>· {product.sizes.join(', ')}</span>}
+            {product.stockTotal != null && product.stockTotal > 0 && <span>· {product.stockTotal} шт.</span>}
           </div>
-          {!product.isActive && <span className="pill">Скрыт</span>}
+          {(!product.isActive || product.stockTotal === 0) && (
+            <div className="row-pills">
+              {!product.isActive && <span className="pill">Скрыт</span>}
+              {product.stockTotal === 0 && <span className="pill pill-strong">Нет в наличии</span>}
+            </div>
+          )}
         </div>
       </Link>
       {sorting ? (
@@ -113,7 +119,10 @@ export function ProductsPage() {
   const withoutCategory = all.filter((p) => p.categoryId == null).length;
   const items = all.filter(
     (p) =>
-      (filter === 'all' || (filter === 'active' ? p.isActive : !p.isActive)) &&
+      (filter === 'all' ||
+        (filter === 'active' && p.isActive) ||
+        (filter === 'hidden' && !p.isActive) ||
+        (filter === 'soldout' && p.stockTotal === 0)) &&
       (activeCategory === 'all' || (activeCategory === 'none' ? p.categoryId == null : p.categoryId === activeCategory)),
   );
   const canSort = filter === 'all' && activeCategory === 'all';
@@ -146,6 +155,7 @@ export function ProductsPage() {
               ['all', 'Все'],
               ['active', 'В каталоге'],
               ['hidden', 'Скрытые'],
+              ['soldout', 'Закончились'],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -163,9 +173,21 @@ export function ProductsPage() {
           ))}
         </div>
         {canSort && all.length > 1 && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSorting((s) => !s)}>
-            {sorting ? 'Готово' : 'Порядок'}
-          </button>
+          sorting ? (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setSorting(false)}>
+              Готово
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Изменить порядок товаров"
+              title="Изменить порядок товаров"
+              onClick={() => setSorting(true)}
+            >
+              <ArrowUpDown size={17} />
+            </button>
+          )
         )}
       </div>
 

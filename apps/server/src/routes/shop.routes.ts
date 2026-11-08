@@ -12,7 +12,7 @@ export async function shopRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.get('/api/products', async (req) => {
     const q = parseInput(productsQuerySchema, req.query);
-    return ctx.products.listCatalog(q.limit, q.offset, q.categoryId);
+    return ctx.products.listCatalog(q);
   });
 
   app.get('/api/categories', async () => ctx.categories.listPublic());

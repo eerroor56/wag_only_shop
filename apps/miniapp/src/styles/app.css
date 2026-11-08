@@ -885,11 +885,14 @@ body:has(.checkout-bar) {
 
 /* ------------------------------------------------------------ categories */
 
-/* Лента категорий прилипает к верху при прокрутке каталога. */
+/* Поиск, сортировка и лента категорий прилипают к верху при прокрутке каталога. */
 .category-bar {
   position: sticky;
   top: var(--content-top);
   z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   margin: -4px calc(var(--gutter) * -1) 14px;
   padding: 8px 0 10px;
   background: color-mix(in srgb, var(--bg) 86%, transparent);
@@ -960,4 +963,430 @@ body:has(.checkout-bar) {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-2);
+}
+
+/* ------------------------------------------------------------ поиск и сортировка */
+
+.catalog-tools {
+  display: flex;
+  gap: 8px;
+  padding: 0 var(--gutter);
+}
+
+.search-box {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.search-field {
+  display: flex;
+  align-items: center;
+  height: 42px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-2);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.search-box.is-open .search-field,
+.search-field:focus-within {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
+.search-field-icon {
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search-field input::placeholder {
+  color: var(--text-3);
+}
+
+.search-field input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search-field-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+}
+
+.search-field-clear svg {
+  box-sizing: content-box;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--text-3);
+  color: var(--surface-2);
+}
+
+@keyframes suggestions-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.search-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: -50px; /* на ширину поля + кнопки сортировки */
+  z-index: 30;
+  max-height: min(380px, 60dvh);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  animation: suggestions-in 0.16s var(--ease);
+}
+
+.search-suggestions-state {
+  display: flex;
+  justify-content: center;
+  padding: 18px 12px;
+  color: var(--text-2);
+  font-size: 14px;
+  text-align: center;
+}
+
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.suggestion:active {
+  background: var(--surface-2);
+}
+
+@media (hover: hover) {
+  .suggestion:hover {
+    background: var(--surface-2);
+  }
+}
+
+.suggestion-thumb {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.suggestion-thumb > * {
+  width: 100%;
+  height: 100%;
+}
+
+.suggestion-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.suggestion-title {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-title mark {
+  background: none;
+  color: inherit;
+  font-weight: 750;
+}
+
+.suggestion-meta {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.suggestion.is-soldout .suggestion-thumb,
+.suggestion.is-soldout .suggestion-title {
+  opacity: 0.45;
+}
+
+.suggestion.is-soldout .suggestion-meta {
+  color: var(--text-3);
+}
+
+.suggestion-all {
+  width: 100%;
+  margin-top: 4px;
+  padding: 11px 8px;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sort-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-2);
+  color: var(--text);
+  transition: transform 0.12s var(--ease);
+}
+
+.sort-button:active {
+  transform: scale(0.94);
+}
+
+.sort-button.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--gutter);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.active-filters span + span::before {
+  content: '· ';
+}
+
+.active-filters button {
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.product-grid.is-refreshing {
+  opacity: 0.55;
+  transition: opacity 0.2s;
+}
+
+/* ------------------------------------------------------------ сортировка (нижняя панель) */
+
+.option-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 8px;
+}
+
+.option-list-separated {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 50px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  transition: background-color 0.15s;
+}
+
+.option-row:active {
+  background: var(--surface-2);
+}
+
+.option-row[role='radio'][aria-checked='true'] {
+  background: var(--surface-2);
+}
+
+.option-row-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option-row-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.option-row-caption {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.option-radio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  color: transparent;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+
+.option-row[aria-checked='true'] .option-radio {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.option-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--surface-3);
+  transition: background-color 0.2s var(--ease);
+}
+
+.option-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.22s var(--ease);
+}
+
+.option-row[aria-checked='true'] .option-switch {
+  background: var(--accent);
+}
+
+.option-row[aria-checked='true'] .option-switch::after {
+  background: var(--accent-text);
+  transform: translateX(18px);
+}
+
+/* ------------------------------------------------------------ наличие */
+
+.product-card.is-soldout .product-card-media > :first-child {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+.product-card.is-soldout .product-card-title,
+.product-card.is-soldout .price {
+  color: var(--text-3);
+}
+
+.product-card.is-soldout .price-current {
+  font-weight: 500;
+}
+
+.product-card-soldout {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.product-card-low {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.size-option.is-soldout {
+  border-style: dashed;
+  border-color: var(--border);
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.size-option:disabled {
+  cursor: default;
+}
+
+.stock-note {
+  align-self: flex-start;
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stock-note.is-out {
+  border-color: var(--text);
+}
+
+.cart-row-unavailable {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
