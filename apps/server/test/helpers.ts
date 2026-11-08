@@ -27,16 +27,49 @@ export async function startFakeTelegram() {
   const blocked = new Set<number>();
   const server = http.createServer((req, res) => {
     let body = '';
+    req.setEncoding('latin1');
     req.on('data', (c) => (body += c));
     req.on('end', () => {
       const method = req.url?.split('/').pop() ?? '';
       let payload: Record<string, unknown> = {};
-      try {
-        payload = body ? JSON.parse(body) : {};
-      } catch {
-        /* multipart не используется */
+      if (String(req.headers['content-type']).startsWith('multipart/form-data')) {
+        // Загрузка файла (sendPhoto с InputFile): разбираем текстовые поля, файл помечаем флагом.
+        const parts = body.split(/--[^\r\n]+\r\n/);
+        for (const part of parts) {
+          const name = /name="([^"]+)"/.exec(part)?.[1];
+          if (!name) continue;
+          const headerEnd = part.indexOf('\r\n\r\n');
+          const headers = part.slice(0, headerEnd);
+          const value = part.slice(headerEnd + 4).replace(/\r\n(--)?$/, '');
+          if (/filename=|content-type:/i.test(headers)) payload[name] = { uploaded: true, bytes: value.length };
+          else payload[name] = Buffer.from(value, 'latin1').toString('utf8');
+        }
+      } else {
+        try {
+          payload = body ? JSON.parse(Buffer.from(body, 'latin1').toString('utf8')) : {};
+        } catch {
+          /* пустое тело */
+        }
       }
+      // Подпись к фото считаем текстом сообщения, клавиатуру из multipart — разбираем.
+      if (typeof payload.reply_markup === 'string') payload.reply_markup = JSON.parse(payload.reply_markup);
+      if (payload.caption !== undefined && payload.text === undefined) payload.text = payload.caption;
       calls.push({ method, payload });
+      if (method === 'sendPhoto') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            ok: true,
+            result: {
+              message_id: calls.length,
+              date: 0,
+              chat: { id: Number(payload.chat_id), type: 'private' },
+              photo: [{ file_id: 'BANNER_FILE_ID', file_unique_id: 'u1', width: 640, height: 640 }],
+            },
+          }),
+        );
+        return;
+      }
       res.setHeader('Content-Type', 'application/json');
       if (method === 'getMe') {
         res.end(JSON.stringify({ ok: true, result: { id: 1234567890, is_bot: true, first_name: 'WAG Shop', username: 'wag_shop_bot' } }));
@@ -55,7 +88,8 @@ export async function startFakeTelegram() {
     url: `http://127.0.0.1:${port}`,
     calls,
     blocked,
-    messagesTo: (chatId: number) => calls.filter((c) => c.method === 'sendMessage' && Number(c.payload.chat_id) === chatId),
+    messagesTo: (chatId: number) =>
+      calls.filter((c) => (c.method === 'sendMessage' || c.method === 'sendPhoto') && Number(c.payload.chat_id) === chatId),
     close: () => new Promise<void>((r) => server.close(() => r())),
   };
 }

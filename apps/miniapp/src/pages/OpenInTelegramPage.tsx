@@ -8,7 +8,9 @@ export function OpenInTelegramPage() {
   const botLink = config?.botUsername ? `https://t.me/${config.botUsername}` : null;
   return (
     <div className="container gate">
-      <div className="wordmark">{config?.shopName ?? 'WAG Shop'}</div>
+      <div className="home-banner gate-banner">
+        <img src="/banner.jpg" alt={config?.shopName ?? 'WAG Shop'} width={640} height={640} />
+      </div>
       <EmptyState
         icon={<Send size={26} strokeWidth={1.6} />}
         title="Откройте магазин в Telegram"

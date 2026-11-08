@@ -113,11 +113,24 @@
   justify-content: center;
   flex: 1;
   gap: 18px;
-  padding: 40px 0 32px;
+  padding: 20px 0 32px;
 }
 
-.home-wordmark {
-  color: var(--text-2);
+/* Обложка-баннер: квадратный логотип обрезается до широкого кадра по центру (логотип остаётся целиком). */
+.home-banner {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #483858;
+  margin-bottom: 4px;
+}
+
+.home-banner img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 49%;
 }
 
 .home-title {
@@ -863,4 +876,9 @@ body:has(.checkout-bar) {
 .admin-entry-chevron {
   color: var(--text-3);
   flex-shrink: 0;
+}
+
+.gate-banner {
+  width: 100%;
+  max-width: 420px;
 }

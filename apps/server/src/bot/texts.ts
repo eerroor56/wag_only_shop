@@ -2,13 +2,17 @@ import { formatPhone, formatPrice } from '@wag/shared';
 import type { AppConfig } from '../config.js';
 import { escapeHtml, formatDateTime } from '../lib/format.js';
 
+/** Приветствие на /start. Отправляется подписью к баннеру, поэтому укладывается в лимит подписи Telegram (1024). */
 export function welcomeText(config: AppConfig): string {
+  const manager = `@${escapeHtml(config.shop.managerUsername)}`;
   return [
-    `<b>${escapeHtml(config.shop.name)}</b>`,
-    escapeHtml(config.shop.description),
+    `👋 Добро пожаловать в <b>${escapeHtml(config.shop.name)}</b> — магазин брендовых вещей.`,
     '',
-    'Откройте каталог, выберите вещи и оформите заказ.',
-    `Менеджер @${escapeHtml(config.shop.managerUsername)} свяжется с вами для подтверждения.`,
+    '🛍 Весь каталог в одном месте: фото, цены и размеры',
+    '⚡️ Заказ за минуту — без регистрации и онлайн-оплаты',
+    `💬 Менеджер ${manager} лично свяжется с вами, ответит на вопросы и согласует детали`,
+    '',
+    'Жмите «Открыть магазин» и выбирайте 👇',
   ].join('\n');
 }
 

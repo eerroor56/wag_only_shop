@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { autoRetry } from '@grammyjs/auto-retry';
-import { Bot, GrammyError, HttpError, InlineKeyboard, type Api } from 'grammy';
+import { Bot, GrammyError, HttpError, InlineKeyboard, InputFile, type Api, type Context } from 'grammy';
 import type { FastifyBaseLogger } from 'fastify';
 import type { AppConfig } from '../config.js';
 import type { UsersService } from '../modules/users/users.service.js';
@@ -62,10 +64,32 @@ export function createTelegramBot(config: AppConfig, usersService: UsersService,
     if (previous) await bot.api.deleteMessage(chatId, previous).catch(() => undefined);
   }
 
+  /**
+   * Баннер приветствия — тот же файл, что на главной Mini App (apps/miniapp/public/banner.jpg → dist).
+   * Загружается в Telegram один раз, дальше переиспользуется file_id. Нет файла или ошибка — приветствие текстом.
+   */
+  const bannerPath = path.join(config.static.miniAppDir, 'banner.jpg');
+  let bannerFileId: string | null = null;
+
+  async function sendWelcome(ctx: { replyWithPhoto: Context['replyWithPhoto']; reply: Context['reply'] }) {
+    const caption = welcomeText(config);
+    const markup = shopKeyboard(config);
+    const photo = bannerFileId ?? (existsSync(bannerPath) ? new InputFile(bannerPath) : null);
+    if (photo) {
+      try {
+        const sent = await ctx.replyWithPhoto(photo, { caption, parse_mode: 'HTML', reply_markup: markup });
+        bannerFileId = sent.photo?.at(-1)?.file_id ?? bannerFileId;
+        return sent;
+      } catch (err) {
+        bannerFileId = null;
+        log.warn({ err: String(err) }, 'Не удалось отправить баннер приветствия — отправляю текстом');
+      }
+    }
+    return ctx.reply(caption, { parse_mode: 'HTML', reply_markup: markup });
+  }
+
   pm.command('start', async (ctx) => {
-    await replaceServiceMessage(ctx.chat.id, () =>
-      ctx.reply(welcomeText(config), { parse_mode: 'HTML', reply_markup: shopKeyboard(config) }),
-    );
+    await replaceServiceMessage(ctx.chat.id, () => sendWelcome(ctx));
   });
 
   // Основной вход в админку — кнопка в Mini App; команда оставлена для администраторов как запасной путь.

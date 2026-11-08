@@ -2,6 +2,9 @@
  * Сценарий 1 (часть бота): пользователь отправляет /start → бот отвечает кнопкой «Открыть магазин».
  * Обновления приходят через webhook с секретным токеном.
  */
+import { copyFile, mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { users } from '../src/db/schema.js';
@@ -10,6 +13,7 @@ import { ADMIN_ID, createTestEnv, waitFor, type TestEnv } from './helpers.js';
 const SECRET = 'test_webhook_secret_0123456789';
 let env: TestEnv;
 let updateId = 1;
+let distDir: string;
 
 function update(payload: Record<string, unknown>, secret: string | null = SECRET) {
   return env.app.inject({
@@ -30,11 +34,15 @@ const from = { id: 6001, is_bot: false, first_name: 'Мария', username: 'mar
 const chat = { id: 6001, type: 'private', first_name: 'Мария' };
 
 beforeAll(async () => {
-  env = await createTestEnv({ BOT_MODE: 'webhook', WEBHOOK_SECRET: SECRET });
+  // Сборка Mini App с баннером — его же бот отправляет в приветствии.
+  distDir = await mkdtemp(path.join(os.tmpdir(), 'wag-miniapp-'));
+  await copyFile(path.resolve(import.meta.dirname, '../../miniapp/public/banner.jpg'), path.join(distDir, 'banner.jpg'));
+  env = await createTestEnv({ BOT_MODE: 'webhook', WEBHOOK_SECRET: SECRET, MINIAPP_DIST: distDir });
 });
 
 afterAll(async () => {
   await env?.close();
+  await rm(distDir, { recursive: true, force: true });
 });
 
 describe('Telegram-бот (webhook)', () => {
@@ -46,15 +54,22 @@ describe('Telegram-бот (webhook)', () => {
     expect(env.telegram.messagesTo(from.id)).toHaveLength(0);
   });
 
-  it('/start: приветствие с кнопкой «Открыть магазин» и сохранение пользователя', async () => {
+  it('/start: баннер с приветствием и кнопкой «Открыть магазин», пользователь сохраняется', async () => {
     const res = await update({
       message: { message_id: 2, date: 0, chat, from, text: '/start', entities: [{ type: 'bot_command', offset: 0, length: 6 }] },
     });
     expect(res.statusCode).toBe(200);
     await waitFor(() => env.telegram.messagesTo(from.id).length > 0);
 
-    const msg = env.telegram.messagesTo(from.id)[0]!.payload;
-    expect(String(msg.text)).toContain('Магазин брендовых вещей');
+    const sent = env.telegram.messagesTo(from.id)[0]!;
+    expect(sent.method).toBe('sendPhoto');
+    // первый раз баннер загружается файлом: photo = "attach://<id>", сам файл — отдельной частью запроса
+    const attach = String(sent.payload.photo);
+    expect(attach.startsWith('attach://')).toBe(true);
+    expect(sent.payload[attach.slice('attach://'.length)]).toMatchObject({ uploaded: true });
+    const msg = sent.payload;
+    expect(msg.parse_mode).toBe('HTML');
+    expect(String(msg.text)).toContain('магазин брендовых вещей');
     expect(String(msg.text)).toContain('@wag_on');
     const button = (msg.reply_markup as { inline_keyboard: { text: string; web_app?: { url: string } }[][] }).inline_keyboard[0]![0]!;
     expect(button).toEqual({ text: 'Открыть магазин', web_app: { url: 'https://shop.test/' } });
@@ -117,7 +132,7 @@ describe('Telegram-бот (webhook)', () => {
   });
 
   it('повторный /start заменяет предыдущее приветствие', async () => {
-    const welcomes = () => env.telegram.messagesTo(from.id).filter((m) => String(m.payload.text).includes('Магазин брендовых'));
+    const welcomes = () => env.telegram.messagesTo(from.id).filter((m) => String(m.payload.text).includes('магазин брендовых'));
     const before = welcomes().length;
     await update({
       message: { message_id: 12, date: 0, chat, from, text: '/start', entities: [{ type: 'bot_command', offset: 0, length: 6 }] },
@@ -125,6 +140,8 @@ describe('Telegram-бот (webhook)', () => {
     await waitFor(() => welcomes().length === before + 1 && deletedIn(from.id).includes(12));
     const previousId = env.telegram.calls.findIndex((c) => c === welcomes()[before - 1]) + 1;
     await waitFor(() => deletedIn(from.id).includes(previousId));
+    // повторно баннер не загружается — используется file_id из первого ответа Telegram
+    expect(welcomes().at(-1)!.payload.photo).toBe('BANNER_FILE_ID');
   });
 
   it('в группах бот не отвечает', async () => {

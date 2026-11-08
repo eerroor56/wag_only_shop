@@ -29,7 +29,9 @@ export function HomePage() {
   return (
     <div className="home">
       <div className="home-hero">
-        <div className="wordmark home-wordmark">{config?.shopName ?? 'WAG Shop'}</div>
+        <div className="home-banner">
+          <img src="/banner.jpg" alt={config?.shopName ?? 'WAG Shop'} width={640} height={640} decoding="async" />
+        </div>
         <h1 className="home-title">
           Wag shop.
           <br />
