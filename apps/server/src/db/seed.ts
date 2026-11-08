@@ -6,11 +6,12 @@
  *   npm run db:seed -- --force — добавить демо-товары в любом случае
  */
 import sharp from 'sharp';
-import { count } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
+import { categoryNameKey } from '@wag/shared';
 import { loadConfig } from '../config.js';
 import { createStorage } from '../storage/index.js';
 import { createDb } from './client.js';
-import { productImages, products } from './schema.js';
+import { categories, productImages, products } from './schema.js';
 
 interface DemoProduct {
   title: string;
@@ -20,6 +21,7 @@ interface DemoProduct {
   discountPercent?: number;
   attributes: { name: string; value: string }[];
   sizes?: string[];
+  category: string;
   shades: string[];
 }
 
@@ -38,6 +40,7 @@ const DEMO: DemoProduct[] = [
       { name: 'Цвет', value: 'Чёрный' },
     ],
     sizes: ['S', 'M', 'L', 'XL'],
+    category: 'Худи',
     shades: ['#1c1c1e', '#2c2c2e', '#3a3a3c'],
   },
   {
@@ -49,6 +52,7 @@ const DEMO: DemoProduct[] = [
       { name: 'Материал', value: '100% хлопок' },
     ],
     sizes: ['M/L', 'XL/XXL'],
+    category: 'Лонгсливы',
     shades: ['#e5e5ea', '#d1d1d6', '#c7c7cc'],
   },
   {
@@ -62,6 +66,7 @@ const DEMO: DemoProduct[] = [
       { name: 'Страна', value: 'Италия' },
     ],
     sizes: ['46', '48', '50', '52', '54'],
+    category: 'Верхняя одежда',
     shades: ['#48484a', '#636366', '#3a3a3c', '#2c2c2e'],
   },
   {
@@ -73,6 +78,7 @@ const DEMO: DemoProduct[] = [
       { name: 'Утеплитель', value: 'Пух 700 FP' },
     ],
     sizes: ['48-52', '52/54'],
+    category: 'Верхняя одежда',
     shades: ['#0f0f10', '#1c1c1e', '#2c2c2e'],
   },
   {
@@ -81,6 +87,8 @@ const DEMO: DemoProduct[] = [
     price: rub(27_490),
     oldPrice: rub(31_990),
     attributes: [{ name: 'Бренд', value: 'New Balance' }],
+    sizes: ['41', '42', '43', '44'],
+    category: 'Кроссовки',
     shades: ['#aeaeb2', '#8e8e93', '#c7c7cc'],
   },
   {
@@ -88,6 +96,7 @@ const DEMO: DemoProduct[] = [
     description: 'Худи из мягкого футера с вышитым логотипом.',
     price: rub(11_990),
     attributes: [{ name: 'Бренд', value: 'Carhartt WIP' }],
+    category: 'Худи',
     shades: ['#3a3a3c', '#48484a'],
   },
 ];
@@ -127,6 +136,19 @@ async function main() {
       return;
     }
 
+    // Категории демо-товаров: существующие (без учёта регистра) переиспользуются.
+    const categoryIds = new Map<string, number>();
+    for (const name of new Set(DEMO.map((d) => d.category))) {
+      const [found] = await handle.db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(eq(categories.nameKey, categoryNameKey(name)));
+      const id =
+        found?.id ??
+        (await handle.db.insert(categories).values({ name, nameKey: categoryNameKey(name), sortOrder: categoryIds.size + 1 }).returning())[0]!.id;
+      categoryIds.set(name, id);
+    }
+
     for (const [i, demo] of DEMO.entries()) {
       const [product] = await handle.db
         .insert(products)
@@ -138,6 +160,7 @@ async function main() {
           discountPercent: demo.discountPercent ?? null,
           attributes: demo.attributes,
           sizes: demo.sizes ?? [],
+          categoryId: categoryIds.get(demo.category)!,
           sortOrder: i,
         })
         .returning({ id: products.id });

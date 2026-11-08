@@ -90,6 +90,8 @@ export const productFieldsSchema = z.object({
   attributes: z.array(productAttributeSchema).max(LIMITS.productAttributesMax).default([]),
   /** Доступные размеры в порядке отображения. Пустой список — товар без размера. */
   sizes: sizesSchema.default([]),
+  /** Категория (группа) товара; null — без категории. */
+  categoryId: z.number().int().positive().nullable().default(null),
   isActive: z.boolean().default(true),
   /** Упорядоченный список загруженных изображений. */
   imageIds: z
@@ -137,6 +139,7 @@ export const productPatchSchema = z.object({
   discountPercent: z.number().int().min(1).max(99).nullable().optional(),
   attributes: z.array(productAttributeSchema).max(LIMITS.productAttributesMax).optional(),
   sizes: sizesSchema.optional(),
+  categoryId: z.number().int().positive().nullable().optional(),
   isActive: z.boolean().optional(),
   imageIds: z.array(z.number().int().positive()).max(LIMITS.productImagesMax).optional(),
   mainImageId: z.number().int().positive().nullable().optional(),
@@ -145,6 +148,22 @@ export type ProductPatch = z.infer<typeof productPatchSchema>;
 
 export const productReorderSchema = z.object({
   ids: z.array(z.number().int().positive()).min(1).max(5000),
+});
+
+// ---------- Категории (админ) ----------
+
+export const categoryNameSchema = cleanText(LIMITS.categoryNameMax)
+  .transform((v) => v.replace(/\s+/g, ' '))
+  .pipe(z.string().min(1, 'Введите название категории'));
+
+/** Ключ сравнения названий категорий: «Кроссовки» и «кроссовки» — одна категория. */
+export const categoryNameKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
+
+export const categoryInputSchema =z.object({ name: categoryNameSchema });
+export type CategoryInput = z.infer<typeof categoryInputSchema>;
+
+export const categoryReorderSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1).max(LIMITS.categoriesMax),
 });
 
 export const adminProductsQuerySchema = z.object({
@@ -174,6 +193,8 @@ export const adminUsersQuerySchema = paginationSchema.extend({
 export const productsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(40),
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  /** Фильтр каталога по категории. */
+  categoryId: z.coerce.number().int().positive().optional(),
 });
 
 // ---------- Рассылка ----------

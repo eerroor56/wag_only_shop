@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import type {
   CartDTO,
+  CategoryDTO,
   CheckoutInput,
   MeDTO,
   OrderDTO,
@@ -30,7 +31,8 @@ export const queryClient = new QueryClient({
 export const keys = {
   config: ['config'] as const,
   me: ['me'] as const,
-  products: ['products'] as const,
+  categories: ['categories'] as const,
+  products: (categoryId: number | null) => ['products', categoryId ?? 'all'] as const,
   product: (id: number) => ['product', id] as const,
   cart: ['cart'] as const,
   order: (id: number) => ['order', id] as const,
@@ -53,12 +55,23 @@ export function useShopConfig() {
 
 const PAGE_SIZE = 40;
 
-export function useCatalog() {
+/** Категории с товарами в продаже — фильтры каталога. */
+export function useCategories() {
+  return useQuery({
+    queryKey: keys.categories,
+    queryFn: ({ signal }) => api.get<CategoryDTO[]>('/api/categories', signal),
+  });
+}
+
+export function useCatalog(categoryId: number | null) {
   return useInfiniteQuery({
-    queryKey: keys.products,
+    queryKey: keys.products(categoryId),
     initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) =>
-      api.get<ProductsPageDTO>(`/api/products?limit=${PAGE_SIZE}&offset=${pageParam}`, signal),
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(pageParam) });
+      if (categoryId != null) params.set('categoryId', String(categoryId));
+      return api.get<ProductsPageDTO>(`/api/products?${params}`, signal);
+    },
     getNextPageParam: (last) => last.nextOffset ?? undefined,
   });
 }

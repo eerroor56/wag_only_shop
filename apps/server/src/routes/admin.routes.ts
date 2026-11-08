@@ -5,6 +5,8 @@ import {
   adminUsersQuerySchema,
   ALLOWED_IMAGE_MIME,
   broadcastCreateSchema,
+  categoryInputSchema,
+  categoryReorderSchema,
   idParamSchema,
   orderUpdateSchema,
   productCreateSchema,
@@ -53,6 +55,33 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
   app.put('/api/admin/products/order', async (req, reply) => {
     const body = parseInput(productReorderSchema, req.body);
     await ctx.products.reorder(body.ids);
+    return reply.code(204).send();
+  });
+
+  // ---------------- категории
+
+  app.get('/api/admin/categories', async () => ctx.categories.adminList());
+
+  app.post('/api/admin/categories', async (req, reply) => {
+    const body = parseInput(categoryInputSchema, req.body);
+    return reply.code(201).send(await ctx.categories.create(body.name));
+  });
+
+  app.put('/api/admin/categories/order', async (req, reply) => {
+    const body = parseInput(categoryReorderSchema, req.body);
+    await ctx.categories.reorder(body.ids);
+    return reply.code(204).send();
+  });
+
+  app.patch('/api/admin/categories/:id', async (req) => {
+    const { id } = parseInput(idParamSchema, req.params);
+    const body = parseInput(categoryInputSchema, req.body);
+    return ctx.categories.rename(id, body.name);
+  });
+
+  app.delete('/api/admin/categories/:id', async (req, reply) => {
+    const { id } = parseInput(idParamSchema, req.params);
+    await ctx.categories.delete(id);
     return reply.code(204).send();
   });
 

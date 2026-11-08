@@ -78,12 +78,26 @@ export function useTelegramBackButton(handler: (() => void) | null) {
   const enabled = handler !== null;
   useEffect(() => {
     if (!isTelegram || !tg || !enabled) return;
-    const cb = () => ref.current?.();
-    tg.BackButton.onClick(cb);
-    tg.BackButton.show();
+    const entry = () => ref.current?.();
+    backStack.push(entry);
+    if (backStack.length === 1) {
+      tg.BackButton.onClick(dispatchBack);
+      tg.BackButton.show();
+    }
     return () => {
-      tg!.BackButton.offClick(cb);
-      tg!.BackButton.hide();
+      const index = backStack.lastIndexOf(entry);
+      if (index >= 0) backStack.splice(index, 1);
+      if (!backStack.length) {
+        tg!.BackButton.offClick(dispatchBack);
+        tg!.BackButton.hide();
+      }
     };
   }, [enabled]);
 }
+
+/**
+ * Стек обработчиков кнопки «Назад»: срабатывает только последний зарегистрированный.
+ * Открытая поверх страницы панель (BottomSheet) закрывается «Назад», не уводя со страницы.
+ */
+const backStack: (() => void)[] = [];
+const dispatchBack = () => backStack.at(-1)?.();

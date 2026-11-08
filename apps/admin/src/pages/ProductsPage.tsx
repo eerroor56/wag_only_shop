@@ -1,21 +1,26 @@
-import { ArrowDown, ArrowUp, Eye, EyeOff, ImageOff, Package, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, FolderCog, ImageOff, Package, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { formatPrice, type AdminProductDTO } from '@wag/shared';
 import { EmptyState, ErrorState, errorMessage, haptic, useToast } from '@wag/web';
-import { useAdminProducts, usePatchProduct, useReorderProducts } from '../api/queries';
+import { useAdminCategories, useAdminProducts, usePatchProduct, useReorderProducts } from '../api/queries';
+import { CategorySheet } from '../components/CategoryPicker';
 import { ListSkeleton, PageHeader } from '../components/common';
 
 type Filter = 'all' | 'active' | 'hidden';
+/** all — все товары, none — без категории, число — id категории. */
+type CategoryFilter = 'all' | 'none' | number;
 
 function ProductRow({
   product,
+  categoryName,
   sorting,
   index,
   total,
   onMove,
 }: {
   product: AdminProductDTO;
+  categoryName: string | null;
   sorting: boolean;
   index: number;
   total: number;
@@ -45,6 +50,7 @@ function ProductRow({
         <div className="list-row-text">
           <div className="list-row-title line-clamp-2">{product.title}</div>
           <div className="list-row-meta">
+            {categoryName && <span className="list-row-category">{categoryName}</span>}
             <span>{formatPrice(product.price)}</span>
             {product.oldPrice != null && <s>{formatPrice(product.oldPrice)}</s>}
             {product.effectiveDiscountPercent != null && <span>−{product.effectiveDiscountPercent}%</span>}
@@ -96,9 +102,21 @@ export function ProductsPage() {
   const reorder = useReorderProducts();
   const [filter, setFilter] = useState<Filter>('all');
   const [sorting, setSorting] = useState(false);
+  const { data: categories } = useAdminCategories();
+  const [category, setCategory] = useState<CategoryFilter>('all');
+  const [manageCategories, setManageCategories] = useState(false);
 
   const all = data?.items ?? [];
-  const items = filter === 'all' ? all : all.filter((p) => (filter === 'active' ? p.isActive : !p.isActive));
+  const categoryNames = new Map((categories ?? []).map((c) => [c.id, c.name]));
+  // Выбранную категорию удалили — показываем все товары.
+  const activeCategory = typeof category === 'number' && !categoryNames.has(category) ? 'all' : category;
+  const withoutCategory = all.filter((p) => p.categoryId == null).length;
+  const items = all.filter(
+    (p) =>
+      (filter === 'all' || (filter === 'active' ? p.isActive : !p.isActive)) &&
+      (activeCategory === 'all' || (activeCategory === 'none' ? p.categoryId == null : p.categoryId === activeCategory)),
+  );
+  const canSort = filter === 'all' && activeCategory === 'all';
 
   const move = (from: number, to: number) => {
     const ids = all.map((p) => p.id);
@@ -144,12 +162,57 @@ export function ProductsPage() {
             </button>
           ))}
         </div>
-        {filter === 'all' && all.length > 1 && (
+        {canSort && all.length > 1 && (
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSorting((s) => !s)}>
             {sorting ? 'Готово' : 'Порядок'}
           </button>
         )}
       </div>
+
+      <div className="chips category-chips" role="group" aria-label="Категории">
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={activeCategory === 'all'}
+          onClick={() => setCategory('all')}
+        >
+          Все категории
+        </button>
+        {(categories ?? []).map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className="chip"
+            aria-pressed={activeCategory === c.id}
+            onClick={() => {
+              setCategory(c.id);
+              setSorting(false);
+            }}
+          >
+            {c.name}
+            <span className="chip-count">{c.productsCount}</span>
+          </button>
+        ))}
+        {withoutCategory > 0 && (categories?.length ?? 0) > 0 && (
+          <button
+            type="button"
+            className="chip"
+            aria-pressed={activeCategory === 'none'}
+            onClick={() => {
+              setCategory('none');
+              setSorting(false);
+            }}
+          >
+            Без категории
+            <span className="chip-count">{withoutCategory}</span>
+          </button>
+        )}
+        <button type="button" className="chip chip-action" onClick={() => setManageCategories(true)}>
+          <FolderCog size={15} strokeWidth={1.8} />
+          {categories?.length ? 'Категории' : 'Создать категории'}
+        </button>
+      </div>
+      <CategorySheet open={manageCategories} onClose={() => setManageCategories(false)} mode="manage" />
 
       {sorting && <p className="caption hint-line">Порядок сохраняется сразу и совпадает с порядком в каталоге.</p>}
 
@@ -172,7 +235,15 @@ export function ProductsPage() {
       ) : (
         <div className="list">
           {items.map((p, i) => (
-            <ProductRow key={p.id} product={p} sorting={sorting} index={i} total={items.length} onMove={move} />
+            <ProductRow
+              key={p.id}
+              product={p}
+              categoryName={activeCategory === 'all' && p.categoryId != null ? (categoryNames.get(p.categoryId) ?? null) : null}
+              sorting={sorting}
+              index={i}
+              total={items.length}
+              onMove={move}
+            />
           ))}
         </div>
       )}

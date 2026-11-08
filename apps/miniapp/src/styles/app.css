@@ -121,7 +121,7 @@
   aspect-ratio: 16 / 9;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  background: #483858;
+  background: #080808;
   margin-bottom: 4px;
 }
 
@@ -881,4 +881,83 @@ body:has(.checkout-bar) {
 .gate-banner {
   width: 100%;
   max-width: 420px;
+}
+
+/* ------------------------------------------------------------ categories */
+
+/* Лента категорий прилипает к верху при прокрутке каталога. */
+.category-bar {
+  position: sticky;
+  top: var(--content-top);
+  z-index: 20;
+  margin: -4px calc(var(--gutter) * -1) 14px;
+  padding: 8px 0 10px;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  backdrop-filter: saturate(160%) blur(18px);
+}
+
+.category-bar-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 var(--gutter);
+  scroll-padding: 0 var(--gutter);
+  /* Края ленты мягко растворяются — видно, что её можно листать. */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--gutter), #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, transparent 0, #000 var(--gutter), #000 calc(100% - 28px), transparent);
+}
+
+.category-bar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 15px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  transition:
+    background-color 0.2s var(--ease),
+    color 0.2s var(--ease),
+    border-color 0.2s var(--ease),
+    transform 0.12s var(--ease);
+}
+
+.category-pill:active {
+  transform: scale(0.95);
+}
+
+.category-pill[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.category-pill-count {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.product-category {
+  align-self: flex-start;
+  margin-bottom: -4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
 }

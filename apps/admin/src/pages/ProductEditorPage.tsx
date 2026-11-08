@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, ImagePlus, Plus, Star, Trash2, X } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   effectiveDiscountPercent,
@@ -25,6 +25,7 @@ import {
 } from '@wag/web';
 import { uploadImage, useAdminProduct, useDeleteProduct, useSaveProduct } from '../api/queries';
 import { PageHeader } from '../components/common';
+import { CategoryPicker } from '../components/CategoryPicker';
 import { SizesEditor } from '../components/SizesEditor';
 
 interface FormState {
@@ -38,6 +39,7 @@ interface FormState {
   isActive: boolean;
   attributes: { key: number; name: string; value: string }[];
   sizes: string[];
+  categoryId: number | null;
 }
 
 interface PendingUpload {
@@ -58,6 +60,7 @@ const EMPTY: FormState = {
   isActive: true,
   attributes: [],
   sizes: [],
+  categoryId: null,
 };
 
 let keySeq = 1;
@@ -73,6 +76,7 @@ function fromProduct(p: AdminProductDTO): FormState {
     isActive: p.isActive,
     attributes: p.attributes.map((a) => ({ key: keySeq++, ...a })),
     sizes: p.sizes,
+    categoryId: p.categoryId,
   };
 }
 
@@ -111,6 +115,7 @@ function toPayload(
       .map(({ name, value }) => ({ name: name.trim(), value: value.trim() }))
       .filter((a) => a.name || a.value),
     sizes: form.sizes,
+    categoryId: form.categoryId,
     imageIds: images.map((i) => i.id),
     mainImageId: mainImageId ?? images[0]?.id ?? null,
   };
@@ -159,6 +164,11 @@ export function ProductEditorPage() {
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((e) => ({ ...e, [key]: '' }));
   };
+
+  const setCategory = useCallback((id: number | null) => {
+    setForm((f) => (f.categoryId === id ? f : { ...f, categoryId: id }));
+    setErrors((e) => ({ ...e, categoryId: '' }));
+  }, []);
 
   // ------------------------------------------------------------ фото
 
@@ -346,6 +356,9 @@ export function ProductEditorPage() {
           />
           {errors.title && <span className="field-error">{errors.title}</span>}
         </label>
+
+        {/* --------------------------------------------------- Категория */}
+        <CategoryPicker value={form.categoryId} onChange={setCategory} error={errors.categoryId} />
 
         {/* --------------------------------------------------- Фото */}
         <section className="field">

@@ -933,3 +933,364 @@ body:has(.tabbar) {
   border: none;
   background: transparent;
 }
+
+/* ------------------------------------------------------------ categories */
+
+.select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 14px 10px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s,
+    transform 0.12s var(--ease);
+}
+
+.select-trigger:active {
+  transform: scale(0.99);
+  background: var(--surface-2);
+}
+
+.select-trigger[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.select-trigger-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.select-trigger-value {
+  font-size: 16px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-trigger-placeholder {
+  font-size: 16px;
+  color: var(--text-2);
+}
+
+.select-trigger-chevron {
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.sheet-text-btn {
+  height: 30px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.cat-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.cat-avatar-muted {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.cat-avatar-accent {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.cat-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  margin: 0 16px 6px;
+  padding: 0 4px 0 12px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: 0 -8px 0 var(--surface);
+}
+
+.cat-search-icon {
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.cat-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.cat-search-input::placeholder {
+  color: var(--text-3);
+}
+
+.cat-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.cat-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.cat-search-clear svg {
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--text-3);
+  color: var(--surface-2);
+  box-sizing: content-box;
+}
+
+.cat-list {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px 12px;
+}
+
+.cat-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  transition: background-color 0.15s;
+}
+
+button.cat-row:active:not(:disabled) {
+  background: var(--surface-2);
+}
+
+@media (hover: hover) {
+  button.cat-row:hover {
+    background: var(--surface-2);
+  }
+}
+
+.cat-row[aria-selected='true'] {
+  background: var(--surface-2);
+}
+
+/* Разделитель между строками — как в списках Telegram, от текста, а не от края. */
+.cat-row + .cat-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 60px;
+  right: 10px;
+  height: 1px;
+  background: var(--border);
+}
+
+.cat-row[aria-selected='true']::before,
+.cat-row[aria-selected='true'] + .cat-row::before {
+  display: none;
+}
+
+.cat-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cat-row-title {
+  font-size: 16px;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cat-row-caption {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.cat-row-create .cat-row-title {
+  font-weight: 650;
+}
+
+.cat-radio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  color: transparent;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    transform 0.2s var(--ease);
+}
+
+.cat-row[aria-selected='true'] .cat-radio {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  transform: scale(1.06);
+}
+
+.cat-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.cat-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  transition:
+    background-color 0.15s,
+    opacity 0.15s;
+}
+
+.cat-action:active:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.cat-action:disabled {
+  opacity: 0.3;
+}
+
+.cat-action-danger {
+  color: var(--danger);
+}
+
+.cat-action-accent {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.cat-action-accent:active:not(:disabled) {
+  background: var(--accent-pressed);
+}
+
+.cat-rename {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cat-rename-input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+  outline: none;
+}
+
+.cat-state,
+.cat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 24px 32px;
+  text-align: center;
+}
+
+.cat-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cat-hint {
+  margin: 0 18px 14px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.category-chips {
+  margin-bottom: 10px;
+}
+
+.chip-count {
+  margin-left: 6px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.chip-action {
+  gap: 6px;
+  border-style: dashed;
+  color: var(--text);
+}
+
+.list-row-category {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.list-row-category::after {
+  content: ' ·';
+  color: var(--text-3);
+  font-weight: 400;
+}

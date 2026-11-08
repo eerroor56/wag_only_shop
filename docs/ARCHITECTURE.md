@@ -77,7 +77,8 @@ broadcasts 1──* broadcast_recipients *──1 users
 | Таблица | Назначение |
 | --- | --- |
 | `users` | Telegram ID, username, имя, `created_at`, `last_seen_at`, `is_blocked` |
-| `products` | Название, описание, `price`, `old_price`, `discount_percent`, `attributes` (JSONB), `is_active`, `sort_order` |
+| `categories` | Группы товаров: `name`, `name_key` (уникальный ключ в нижнем регистре, считается в приложении), `sort_order` |
+| `products` | Название, описание, `price`, `old_price`, `discount_percent`, `attributes` (JSONB), `sizes`, `category_id` (SET NULL), `is_active`, `sort_order` |
 | `product_images` | `storage_key`, `thumb_key`, размеры, `sort_order`, `is_main` |
 | `carts`, `cart_items` | Корзина пользователя, уникальная пара (cart, product), количество 1–99 |
 | `orders` | Номер (с 1001), имя, телефон (E.164), username-snapshot, сумма, статус, ключ идемпотентности, статус уведомления |

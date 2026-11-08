@@ -59,6 +59,24 @@ export const users = pgTable(
   (t) => [index('users_created_at_idx').on(t.createdAt)],
 );
 
+// ---------------------------------------------------------------- categories
+
+/** Группы товаров (Кроссовки, Худи…). Название уникально без учёта регистра. */
+export const categories = pgTable(
+  'categories',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    name: varchar('name', { length: 40 }).notNull(),
+    /**
+     * Ключ уникальности: название в нижнем регистре (categoryNameKey). Считается в приложении —
+     * lower() в Postgres зависит от локали кластера и в локали C не понижает кириллицу.
+     */
+    nameKey: varchar('name_key', { length: 40 }).notNull().unique('categories_name_key_uq'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+  },
+);
+
 // ---------------------------------------------------------------- products
 
 export const products = pgTable(
@@ -77,6 +95,8 @@ export const products = pgTable(
     attributes: jsonb('attributes').$type<ProductAttribute[]>().notNull().default([]),
     /** Доступные размеры в порядке отображения (M, 48, 48-52, 52/54…). Пусто — товар без размера. */
     sizes: text('sizes').array().notNull().default(sql`'{}'::text[]`),
+    /** Категория; при удалении категории товары остаются без неё. */
+    categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
     isActive: boolean('is_active').notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: createdAt(),
@@ -84,6 +104,7 @@ export const products = pgTable(
   },
   (t) => [
     index('products_catalog_idx').on(t.isActive, t.sortOrder, t.id),
+    index('products_category_idx').on(t.categoryId, t.isActive, t.sortOrder),
     check('products_price_check', sql`${t.price} >= 0`),
     check('products_old_price_check', sql`${t.oldPrice} IS NULL OR ${t.oldPrice} > ${t.price}`),
     check(
@@ -245,6 +266,7 @@ export const broadcastRecipients = pgTable(
 );
 
 export type User = typeof users.$inferSelect;
+export type Category = typeof categories.$inferSelect;
 export type Product = typeof products.$inferSelect;
 export type ProductImage = typeof productImages.$inferSelect;
 export type Order = typeof orders.$inferSelect;

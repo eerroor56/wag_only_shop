@@ -49,7 +49,24 @@ export interface ProductCardDTO {
   sizes: string[];
 }
 
+/** Категория в каталоге покупателя: только непустые, productsCount — товары в продаже. */
+export interface CategoryDTO {
+  id: number;
+  name: string;
+  productsCount: number;
+}
+
+export interface AdminCategoryDTO {
+  id: number;
+  name: string;
+  /** Все товары категории, включая скрытые. */
+  productsCount: number;
+  /** Товары категории, видимые покупателям. */
+  activeCount: number;
+}
+
 export interface ProductDetailDTO extends ProductCardDTO {
+  category: { id: number; name: string } | null;
   description: string;
   attributes: ProductAttribute[];
   /** Галерея: главное фото первым, далее в порядке администратора. */
@@ -127,6 +144,7 @@ export interface AdminProductDTO {
   effectiveDiscountPercent: number | null;
   attributes: ProductAttribute[];
   sizes: string[];
+  categoryId: number | null;
   isActive: boolean;
   sortOrder: number;
   images: AdminImageDTO[];

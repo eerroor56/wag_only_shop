@@ -127,6 +127,11 @@ export function ProductPage() {
       <Gallery images={product.images} title={product.title} />
 
       <div className="container product-info">
+        {product.category && (
+          <Link to={`/catalog?c=${product.category.id}`} className="product-category">
+            {product.category.name}
+          </Link>
+        )}
         <h1 className="product-title">{product.title}</h1>
         <PriceView
           price={product.price}

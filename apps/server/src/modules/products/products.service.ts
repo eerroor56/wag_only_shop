@@ -13,10 +13,11 @@ import {
 } from '@wag/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Database, DbExecutor } from '../../db/client.js';
-import { productImages, products, type Product, type ProductImage } from '../../db/schema.js';
+import { categories, productImages, products, type Product, type ProductImage } from '../../db/schema.js';
 import { badRequest, notFound, validationError } from '../../lib/errors.js';
 import { processProductImage } from '../../storage/image-processor.js';
 import type { StorageDriver } from '../../storage/index.js';
+import type { CategoriesService } from '../categories/categories.service.js';
 import { galleryOrder, mainImage, sortImages, toAdminImageDTO, toImageDTO } from './product-images.js';
 
 const ORPHAN_IMAGE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -25,6 +26,7 @@ export class ProductsService {
   constructor(
     private readonly db: Database,
     private readonly storage: StorageDriver,
+    private readonly categories: CategoriesService,
     private readonly log: FastifyBaseLogger,
   ) {}
 
@@ -55,6 +57,7 @@ export class ProductsService {
       effectiveDiscountPercent: effectiveDiscountPercent(p),
       attributes: p.attributes,
       sizes: p.sizes,
+      categoryId: p.categoryId,
       isActive: p.isActive,
       sortOrder: p.sortOrder,
       images: sorted.map((i): AdminImageDTO => ({ ...toAdminImageDTO(i, this.storage), isMain: i.id === main?.id })),
@@ -88,8 +91,11 @@ export class ProductsService {
 
   // ------------------------------------------------------------------ catalog (покупатель)
 
-  async listCatalog(limit: number, offset: number): Promise<ProductsPageDTO> {
-    const where = eq(products.isActive, true);
+  async listCatalog(limit: number, offset: number, categoryId?: number): Promise<ProductsPageDTO> {
+    const where = and(
+      eq(products.isActive, true),
+      categoryId !== undefined ? eq(products.categoryId, categoryId) : undefined,
+    );
     const [rows, [totalRow]] = await Promise.all([
       this.db
         .select()
@@ -114,10 +120,19 @@ export class ProductsService {
       where: and(eq(products.id, id), eq(products.isActive, true)),
     });
     if (!product) throw notFound('Товар не найден или снят с продажи');
-    const images = (await this.imagesFor(this.db, [id])).get(id) ?? [];
+    const [images, category] = await Promise.all([
+      this.imagesFor(this.db, [id]).then((m) => m.get(id) ?? []),
+      product.categoryId != null
+        ? this.db.query.categories.findFirst({
+            where: eq(categories.id, product.categoryId),
+            columns: { id: true, name: true },
+          })
+        : undefined,
+    ]);
     const gallery = galleryOrder(images);
     return {
       ...this.toCard(product, gallery[0]),
+      category: category ?? null,
       description: product.description,
       attributes: product.attributes,
       images: gallery.map((i) => toImageDTO(i, this.storage)),
@@ -150,6 +165,7 @@ export class ProductsService {
 
   async create(input: ProductFields): Promise<AdminProductDTO> {
     const id = await this.db.transaction(async (tx) => {
+      await this.categories.assertExists(tx, input.categoryId);
       // Новые товары появляются в начале каталога.
       const [{ minOrder } = { minOrder: null }] = await tx.select({ minOrder: min(products.sortOrder) }).from(products);
       const [created] = await tx
@@ -162,6 +178,7 @@ export class ProductsService {
           discountPercent: input.discountPercent,
           attributes: input.attributes,
           sizes: input.sizes,
+          categoryId: input.categoryId,
           isActive: input.isActive,
           sortOrder: (minOrder ?? 1) - 1,
         })
@@ -187,12 +204,14 @@ export class ProductsService {
         discountPercent: patch.discountPercent !== undefined ? patch.discountPercent : current.discountPercent,
         attributes: patch.attributes ?? current.attributes,
         sizes: patch.sizes ?? current.sizes,
+        categoryId: patch.categoryId !== undefined ? patch.categoryId : current.categoryId,
         isActive: patch.isActive ?? current.isActive,
         imageIds: patch.imageIds ?? sorted.map((i) => i.id),
         mainImageId: patch.mainImageId !== undefined ? patch.mainImageId : (mainImage(sorted)?.id ?? null),
       };
       const issues = productRuleIssues(merged);
       if (issues.length) throw validationError(issues);
+      if (patch.categoryId !== undefined) await this.categories.assertExists(tx, merged.categoryId);
 
       await tx
         .update(products)
@@ -204,6 +223,7 @@ export class ProductsService {
           discountPercent: merged.discountPercent,
           attributes: merged.attributes,
           sizes: merged.sizes,
+          categoryId: merged.categoryId,
           isActive: merged.isActive,
         })
         .where(eq(products.id, id));

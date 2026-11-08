@@ -7,6 +7,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import type {
+  AdminCategoryDTO,
   AdminImageDTO,
   AdminOrderDTO,
   AdminProductDTO,
@@ -37,6 +38,7 @@ export const keys = {
   me: ['me'] as const,
   dashboard: ['dashboard'] as const,
   products: ['admin-products'] as const,
+  categories: ['admin-categories'] as const,
   product: (id: number) => ['admin-product', id] as const,
   orders: (status: string, q: string) => ['admin-orders', status, q] as const,
   order: (id: number) => ['admin-order', id] as const,
@@ -85,6 +87,7 @@ export function useSaveProduct() {
     onSuccess: (product) => {
       qc.setQueryData(keys.product(product.id), product);
       void qc.invalidateQueries({ queryKey: keys.products });
+      void qc.invalidateQueries({ queryKey: keys.categories });
       void qc.invalidateQueries({ queryKey: keys.dashboard });
     },
   });
@@ -113,6 +116,7 @@ export function usePatchProduct() {
     onSuccess: (product) => qc.setQueryData(keys.product(product.id), product),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.products });
+      void qc.invalidateQueries({ queryKey: keys.categories });
       void qc.invalidateQueries({ queryKey: keys.dashboard });
     },
   });
@@ -124,6 +128,7 @@ export function useDeleteProduct() {
     mutationFn: (id: number) => api.delete<void>(`/api/admin/products/${id}`),
     onSuccess: (_r, id) => {
       qc.removeQueries({ queryKey: keys.product(id) });
+      void qc.invalidateQueries({ queryKey: keys.categories });
       void qc.invalidateQueries({ queryKey: keys.products });
       void qc.invalidateQueries({ queryKey: keys.dashboard });
     },
@@ -152,6 +157,66 @@ export function useReorderProducts() {
     },
     mutationKey: ['reorder'],
   });
+}
+
+// ------------------------------------------------------------------ categories
+
+export function useAdminCategories() {
+  return useQuery({
+    queryKey: keys.categories,
+    queryFn: () => api.get<AdminCategoryDTO[]>('/api/admin/categories'),
+  });
+}
+
+/** Создание, переименование, удаление и порядок категорий. Счётчики товаров обновляются с сервера. */
+export function useCategoryMutations() {
+  const qc = useQueryClient();
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: keys.categories });
+  };
+  const create = useMutation({
+    mutationFn: (name: string) => api.post<AdminCategoryDTO>('/api/admin/categories', { name }),
+    onSuccess: (created) => {
+      qc.setQueryData<AdminCategoryDTO[]>(keys.categories, (list) => (list ? [...list, created] : [created]));
+      refresh();
+    },
+  });
+  const rename = useMutation({
+    mutationFn: (vars: { id: number; name: string }) =>
+      api.patch<AdminCategoryDTO>(`/api/admin/categories/${vars.id}`, { name: vars.name }),
+    onSuccess: (updated) => {
+      qc.setQueryData<AdminCategoryDTO[]>(keys.categories, (list) => list?.map((c) => (c.id === updated.id ? updated : c)));
+      refresh();
+    },
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => api.delete<void>(`/api/admin/categories/${id}`),
+    onSuccess: (_r, id) => {
+      qc.setQueryData<AdminCategoryDTO[]>(keys.categories, (list) => list?.filter((c) => c.id !== id));
+      refresh();
+      // Товары удалённой категории остались без неё.
+      void qc.invalidateQueries({ queryKey: keys.products });
+      void qc.invalidateQueries({ queryKey: ['admin-product'] });
+    },
+  });
+  const reorder = useMutation({
+    mutationKey: ['reorder-categories'],
+    mutationFn: (ids: number[]) => api.put<void>('/api/admin/categories/order', { ids }),
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: keys.categories });
+      const previous = qc.getQueryData<AdminCategoryDTO[]>(keys.categories);
+      if (previous) {
+        const byId = new Map(previous.map((c) => [c.id, c]));
+        qc.setQueryData(keys.categories, ids.map((id) => byId.get(id)).filter((c): c is AdminCategoryDTO => Boolean(c)));
+      }
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => ctx?.previous && qc.setQueryData(keys.categories, ctx.previous),
+    onSettled: () => {
+      if (qc.isMutating({ mutationKey: ['reorder-categories'] }) <= 1) refresh();
+    },
+  });
+  return { create, rename, remove, reorder };
 }
 
 export function uploadImage(file: File): Promise<AdminImageDTO> {
