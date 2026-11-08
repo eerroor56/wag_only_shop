@@ -926,3 +926,10 @@ body:has(.tabbar) {
   color: var(--text-2);
   vertical-align: middle;
 }
+
+/* Переключатель внутри карточки цен — без собственной рамки */
+.switch-row-plain {
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+}

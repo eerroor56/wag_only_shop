@@ -423,6 +423,25 @@ describe('Админ-панель', () => {
     expect(p.status).toBe(400); // скидка без старой цены
   });
 
+  it('цена без скидки: создание и снятие скидки у товара', async () => {
+    const plain = await createProduct({ title: 'Без скидки', price: 5_000_00 });
+    expect(plain).toMatchObject({ oldPrice: null, discountPercent: null, effectiveDiscountPercent: null });
+    const plainCard = await api<ProductDetailDTO>('GET', `/api/products/${plain.id}`, tma(buyer));
+    expect(plainCard.body).toMatchObject({ price: 5_000_00, oldPrice: null, discountPercent: null });
+
+    const discounted = await createProduct({ title: 'Была скидка', price: 80_00, oldPrice: 100_00, discountPercent: 25 });
+    // Выключение скидки в админке отправляет обе величины как null
+    const off = await api<AdminProductDTO>('PATCH', `/api/admin/products/${discounted.id}`, adminHeaders(), {
+      price: 90_00,
+      oldPrice: null,
+      discountPercent: null,
+    });
+    expect(off.status, JSON.stringify(off.body)).toBe(200);
+    expect(off.body).toMatchObject({ price: 90_00, oldPrice: null, discountPercent: null, effectiveDiscountPercent: null });
+    const card = await api<ProductDetailDTO>('GET', `/api/products/${discounted.id}`, tma(buyer));
+    expect(card.body).toMatchObject({ price: 90_00, oldPrice: null, discountPercent: null });
+  });
+
   it('изменение порядка товаров', async () => {
     const list = (await api<{ items: AdminProductDTO[] }>('GET', '/api/admin/products', adminHeaders())).body.items;
     const ids = list.map((p) => p.id).reverse();

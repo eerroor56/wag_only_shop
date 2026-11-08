@@ -33,6 +33,8 @@ interface FormState {
   price: string;
   oldPrice: string;
   discountPercent: string;
+  /** Переключатель «Скидка»: выключен — товар продаётся по обычной цене без старой цены и процента. */
+  hasDiscount: boolean;
   isActive: boolean;
   attributes: { key: number; name: string; value: string }[];
   sizes: string[];
@@ -52,6 +54,7 @@ const EMPTY: FormState = {
   price: '',
   oldPrice: '',
   discountPercent: '',
+  hasDiscount: false,
   isActive: true,
   attributes: [],
   sizes: [],
@@ -66,6 +69,7 @@ function fromProduct(p: AdminProductDTO): FormState {
     price: kopecksToInput(p.price),
     oldPrice: kopecksToInput(p.oldPrice),
     discountPercent: p.discountPercent != null ? String(p.discountPercent) : '',
+    hasDiscount: p.oldPrice != null,
     isActive: p.isActive,
     attributes: p.attributes.map((a) => ({ key: keySeq++, ...a })),
     sizes: p.sizes,
@@ -81,11 +85,18 @@ function toPayload(
   const errors: Errors = {};
   const price = parseRublesInput(form.price);
   if (price == null) errors.price = form.price.trim() ? 'Введите цену числом, например 19990' : 'Укажите цену';
-  const oldPrice = form.oldPrice.trim() ? parseRublesInput(form.oldPrice) : null;
-  if (form.oldPrice.trim() && oldPrice == null) errors.oldPrice = 'Введите цену числом';
-  const discount = form.discountPercent.trim() ? Number(form.discountPercent.replace('%', '').trim()) : null;
-  if (discount != null && (!Number.isInteger(discount) || discount < 1 || discount > 99)) {
-    errors.discountPercent = 'Скидка — целое число от 1 до 99';
+  // Скидка выключена — старая цена и процент не отправляются, даже если остались в полях.
+  let oldPrice: number | null = null;
+  let discount: number | null = null;
+  if (form.hasDiscount) {
+    oldPrice = form.oldPrice.trim() ? parseRublesInput(form.oldPrice) : null;
+    if (oldPrice == null) {
+      errors.oldPrice = form.oldPrice.trim() ? 'Введите цену числом' : 'Укажите старую цену или выключите скидку';
+    }
+    discount = form.discountPercent.trim() ? Number(form.discountPercent.replace('%', '').trim()) : null;
+    if (discount != null && (!Number.isInteger(discount) || discount < 1 || discount > 99)) {
+      errors.discountPercent = 'Скидка — целое число от 1 до 99';
+    }
   }
   if (Object.keys(errors).length) return { data: null, errors };
 
@@ -302,6 +313,7 @@ export function ProductEditorPage() {
   const preview = (() => {
     const price = parseRublesInput(form.price);
     if (price == null) return null;
+    if (!form.hasDiscount) return { price, oldPrice: null, discountPercent: null };
     const oldPrice = form.oldPrice.trim() ? parseRublesInput(form.oldPrice) : null;
     const discount = form.discountPercent.trim() ? Number(form.discountPercent) : null;
     const valid = oldPrice != null && oldPrice > price;
@@ -418,36 +430,8 @@ export function ProductEditorPage() {
 
         {/* --------------------------------------------------- Цены */}
         <section className="card editor-card">
-          <div className="field-row">
-            <label className="field">
-              <span className="field-label">Старая цена, ₽</span>
-              <input
-                className="input"
-                inputMode="decimal"
-                placeholder="24 990"
-                value={form.oldPrice}
-                aria-invalid={Boolean(errors.oldPrice)}
-                onChange={(e) => set('oldPrice', e.target.value)}
-              />
-            </label>
-            <label className="field field-narrow">
-              <span className="field-label">Скидка, %</span>
-              <input
-                className="input"
-                inputMode="numeric"
-                placeholder="авто"
-                value={form.discountPercent}
-                aria-invalid={Boolean(errors.discountPercent)}
-                onChange={(e) => set('discountPercent', e.target.value.replace(/[^\d]/g, '').slice(0, 2))}
-              />
-            </label>
-          </div>
-          {(errors.oldPrice || errors.discountPercent) && (
-            <span className="field-error">{errors.oldPrice || errors.discountPercent}</span>
-          )}
-
           <label className="field">
-            <span className="field-label">{form.oldPrice ? 'Цена со скидкой, ₽' : 'Цена, ₽'}</span>
+            <span className="field-label">{form.hasDiscount ? 'Цена со скидкой, ₽' : 'Цена, ₽'}</span>
             <input
               className="input"
               inputMode="decimal"
@@ -459,16 +443,66 @@ export function ProductEditorPage() {
             {errors.price && <span className="field-error">{errors.price}</span>}
           </label>
 
-          {form.oldPrice && form.discountPercent && (
-            <button type="button" className="btn btn-outline btn-sm" onClick={applyDiscount}>
-              Рассчитать цену со скидкой {form.discountPercent}%
-            </button>
-          )}
+          <label className="switch-row switch-row-plain">
+            <span>
+              <span className="switch-title">Скидка</span>
+              <span className="caption">
+                {form.hasDiscount ? 'Покупатель увидит зачёркнутую старую цену и процент' : 'Товар продаётся по обычной цене'}
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              className="switch"
+              checked={form.hasDiscount}
+              onChange={(e) => {
+                set('hasDiscount', e.target.checked);
+                setErrors((er) => ({ ...er, oldPrice: '', discountPercent: '' }));
+              }}
+            />
+          </label>
 
-          <p className="field-hint">
-            Покупатель платит «цену со скидкой» — её всегда задаёте вы. Если процент не указан, он рассчитается
-            автоматически из старой цены.
-          </p>
+          {form.hasDiscount && (
+            <>
+              <div className="field-row">
+                <label className="field">
+                  <span className="field-label">Старая цена, ₽</span>
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    placeholder="24 990"
+                    value={form.oldPrice}
+                    aria-invalid={Boolean(errors.oldPrice)}
+                    onChange={(e) => set('oldPrice', e.target.value)}
+                  />
+                </label>
+                <label className="field field-narrow">
+                  <span className="field-label">Скидка, %</span>
+                  <input
+                    className="input"
+                    inputMode="numeric"
+                    placeholder="авто"
+                    value={form.discountPercent}
+                    aria-invalid={Boolean(errors.discountPercent)}
+                    onChange={(e) => set('discountPercent', e.target.value.replace(/[^\d]/g, '').slice(0, 2))}
+                  />
+                </label>
+              </div>
+              {(errors.oldPrice || errors.discountPercent) && (
+                <span className="field-error">{errors.oldPrice || errors.discountPercent}</span>
+              )}
+
+              {form.oldPrice && form.discountPercent && (
+                <button type="button" className="btn btn-outline btn-sm" onClick={applyDiscount}>
+                  Рассчитать цену со скидкой {form.discountPercent}%
+                </button>
+              )}
+
+              <p className="field-hint">
+                Покупатель платит «цену со скидкой» — её всегда задаёте вы. Если процент не указан, он рассчитается
+                автоматически из старой цены.
+              </p>
+            </>
+          )}
 
           {preview && (
             <div className="price-preview">
