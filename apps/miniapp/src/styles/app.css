@@ -1054,7 +1054,7 @@ body:has(.checkout-bar) {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  right: -50px; /* на ширину поля + кнопки сортировки */
+  right: -100px; /* на ширину поля + кнопок фильтров и сортировки */
   z-index: 30;
   max-height: min(380px, 60dvh);
   overflow-y: auto;
@@ -1160,7 +1160,7 @@ body:has(.checkout-bar) {
   font-weight: 600;
 }
 
-.sort-button {
+.tool-button {
   position: relative;
   display: flex;
   align-items: center;
@@ -1174,38 +1174,72 @@ body:has(.checkout-bar) {
   transition: transform 0.12s var(--ease);
 }
 
-.sort-button:active {
+.tool-button:active {
   transform: scale(0.94);
 }
 
-.sort-button.is-active {
+.tool-button.is-active {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
 }
 
+.tool-button-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 2px solid var(--bg);
+  border-radius: 10px;
+  box-sizing: content-box;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+/* Включённые фильтры: лента «чипов» с крестиком. */
 .active-filters {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
   padding: 0 var(--gutter);
+}
+
+.active-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.active-filter,
+.active-filter-reset {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 6px;
+  height: 30px;
+  padding: 0 9px 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
   font-size: 13px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.active-filter svg:last-child {
   color: var(--text-2);
 }
 
-.active-filters span + span::before {
-  content: '· ';
-}
-
-.active-filters button {
-  margin-left: auto;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+.active-filter-reset {
+  padding: 0 11px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
 }
 
 .product-grid.is-refreshing {
@@ -1389,4 +1423,363 @@ body:has(.checkout-bar) {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+/* ------------------------------------------------------------ панель фильтров */
+
+.sheet-text-btn {
+  height: 30px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.filter-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 36px 16px;
+}
+
+.filter-body {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 4px;
+}
+
+.filter-section {
+  padding: 6px 16px 18px;
+}
+
+.filter-section + .filter-section {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.filter-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 24px;
+  margin-bottom: 12px;
+}
+
+.filter-section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.filter-section-reset {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.filter-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    transform 0.12s var(--ease);
+}
+
+.filter-chip:active {
+  transform: scale(0.96);
+}
+
+.filter-chip[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.filter-chip-count {
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+.filter-chip-size {
+  justify-content: center;
+  min-width: 52px;
+  padding: 0 10px;
+  border-radius: 11px;
+  font-weight: 600;
+}
+
+.filter-chip-more {
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.filter-segmented {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  padding: 3px;
+  border-radius: 13px;
+  background: var(--surface-2);
+}
+
+.filter-segment {
+  height: 36px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 550;
+  transition:
+    background-color 0.18s var(--ease),
+    color 0.18s;
+}
+
+.filter-segment[aria-checked='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.filter-colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px 4px;
+  margin: 0 -6px;
+}
+
+.filter-color {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 2px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.filter-color[aria-pressed='true'] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.filter-color .swatch {
+  transition: transform 0.12s var(--ease);
+}
+
+.filter-color:active .swatch {
+  transform: scale(0.9);
+}
+
+/* ------------------------------------------------------------ диапазон цены */
+
+.price-range {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.price-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.price-inputs-dash {
+  color: var(--text-3);
+}
+
+.price-input {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 14px;
+  transition: border-color 0.15s;
+}
+
+.price-input:focus-within {
+  border-color: var(--border-strong);
+}
+
+.price-input input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.price-input-currency {
+  color: var(--text-3);
+}
+
+.price-slider {
+  --thumb: 26px;
+  position: relative;
+  height: 32px;
+  margin: 0 2px;
+}
+
+.price-slider-track {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--thumb) / 2);
+  right: calc(var(--thumb) / 2);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  transform: translateY(-50%);
+}
+
+.price-slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--lo) * 100%);
+  right: calc((1 - var(--hi)) * 100%);
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.price-slider input[type='range'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.price-slider input[type='range']:focus {
+  outline: none;
+}
+
+.price-slider input[type='range']::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+
+.price-slider input[type='range']::-moz-range-track {
+  background: transparent;
+}
+
+.price-slider input[type='range']::-webkit-slider-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: calc((32px - var(--thumb)) / 2);
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.price-slider input[type='range']::-moz-range-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  box-sizing: border-box;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.price-slider input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.price-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -6px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ------------------------------------------------------------ бренд и характеристики */
+
+.product-card-brand {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+
+.attribute-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+
+.attribute-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.attribute-color .swatch-dots .swatch {
+  border-color: var(--bg);
 }

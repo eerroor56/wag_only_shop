@@ -1402,3 +1402,241 @@ button.cat-row:active:not(:disabled) {
 .stock-summary b {
   color: var(--text);
 }
+
+/* ------------------------------------------------------------ фильтры каталога (бренд, пол, цвет, материал, сезон) */
+
+.editor-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.editor-card-head .switch-title {
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.segmented.segmented-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.segmented-4 .segment {
+  padding: 0 4px;
+  font-size: 13px;
+}
+
+.brand-suggestions {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.brand-suggestions::-webkit-scrollbar {
+  display: none;
+}
+
+.brand-suggestions .chip {
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+.palette-input {
+  display: flex;
+  gap: 8px;
+}
+
+.palette-input .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.palette-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 48px;
+  height: 48px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  transition: transform 0.12s var(--ease);
+}
+
+.palette-trigger:active {
+  transform: scale(0.94);
+}
+
+.palette-trigger.has-value {
+  border-color: var(--border-strong);
+}
+
+.palette-trigger .swatch-dots .swatch {
+  border-color: var(--surface-2);
+}
+
+.palette-trigger-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.palette-picked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.palette-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 2px 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.palette-tag button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.palette-suggest {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.inline-icon {
+  display: inline;
+  vertical-align: -2px;
+}
+
+.palette-hint {
+  margin: 0;
+  padding: 0 16px 12px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px 6px;
+  padding: 0 10px 14px;
+}
+
+.palette-color {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 2px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.palette-color[aria-pressed='true'] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.palette-color:disabled {
+  opacity: 0.35;
+}
+
+.palette-color:active:not(:disabled) .swatch {
+  transform: scale(0.92);
+}
+
+.palette-color .swatch {
+  transition: transform 0.12s var(--ease);
+}
+
+.palette-materials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.palette-material {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 14px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.palette-material-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  color: transparent;
+}
+
+.palette-material[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.palette-material[aria-pressed='true'] .palette-material-check {
+  border-color: var(--accent-text);
+  background: var(--accent-text);
+  color: var(--accent);
+}
+
+.palette-material:disabled {
+  opacity: 0.35;
+}

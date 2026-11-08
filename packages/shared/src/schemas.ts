@@ -4,6 +4,7 @@ import { ORDER_STATUSES } from './order-status.js';
 import { normalizePhone } from './phone.js';
 import { normalizeSizeLabel, SIZE_LABEL_MAX, SIZE_LABEL_PATTERN, sizeKey } from './sizes.js';
 import { CATALOG_SORTS } from './stock.js';
+import { brandKey, COLOR_KEYS, GENDERS, MATERIAL_KEYS, PALETTE_PICK_MAX, SEASONS } from './filters.js';
 
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
@@ -88,6 +89,25 @@ export const productAttributeSchema = z.object({
 });
 export type ProductAttribute = z.infer<typeof productAttributeSchema>;
 
+const unique = <T>(list: T[]) => [...new Set(list)];
+
+/** Необязательный однострочный текст: пробелы схлопываются, пустая строка → null. */
+const optionalText = (max: number) =>
+  cleanText(max)
+    .transform((v) => v.replace(/\s+/g, ' ') || null)
+    .nullable();
+
+const brandSchema = optionalText(LIMITS.brandMax).refine(
+  (v) => v == null || !v.includes(','),
+  'Бренд не может содержать запятую',
+);
+
+const paletteList = <T extends string>(keys: readonly [T, ...T[]], what: string) =>
+  z
+    .array(z.enum(keys))
+    .max(PALETTE_PICK_MAX, `Отметьте не более ${PALETTE_PICK_MAX}: ${what}`)
+    .transform(unique);
+
 export const productFieldsSchema = z.object({
   title: cleanText(LIMITS.productTitleMax).pipe(z.string().min(1, 'Введите название')),
   description: z
@@ -105,6 +125,16 @@ export const productFieldsSchema = z.object({
   stock: stockSchema.default(null),
   /** Категория (группа) товара; null — без категории. */
   categoryId: z.number().int().positive().nullable().default(null),
+  /** Бренд — по нему фильтруют каталог; без учёта регистра «Nike» и «NIKE» — один бренд. */
+  brand: brandSchema.default(null),
+  /** Цвет для покупателя («Графитовый меланж»); colors — значения палитры для фильтра. */
+  colorName: optionalText(LIMITS.colorNameMax).default(null),
+  colors: paletteList(COLOR_KEYS, 'цвета').default([]),
+  /** Материал / состав для покупателя; materials — значения палитры для фильтра. */
+  materialName: optionalText(LIMITS.materialNameMax).default(null),
+  materials: paletteList(MATERIAL_KEYS, 'материалы').default([]),
+  gender: z.enum(GENDERS).nullable().default(null),
+  seasons: z.array(z.enum(SEASONS)).max(SEASONS.length).transform(unique).default([]),
   isActive: z.boolean().default(true),
   /** Упорядоченный список загруженных изображений. */
   imageIds: z
@@ -154,6 +184,13 @@ export const productPatchSchema = z.object({
   sizes: sizesSchema.optional(),
   stock: stockSchema.optional(),
   categoryId: z.number().int().positive().nullable().optional(),
+  brand: brandSchema.optional(),
+  colorName: optionalText(LIMITS.colorNameMax).optional(),
+  colors: paletteList(COLOR_KEYS, 'цвета').optional(),
+  materialName: optionalText(LIMITS.materialNameMax).optional(),
+  materials: paletteList(MATERIAL_KEYS, 'материалы').optional(),
+  gender: z.enum(GENDERS).nullable().optional(),
+  seasons: z.array(z.enum(SEASONS)).max(SEASONS.length).transform(unique).optional(),
   isActive: z.boolean().optional(),
   imageIds: z.array(z.number().int().positive()).max(LIMITS.productImagesMax).optional(),
   mainImageId: z.number().int().positive().nullable().optional(),
@@ -204,6 +241,23 @@ export const adminUsersQuerySchema = paginationSchema.extend({
   q: z.string().trim().max(100).optional(),
 });
 
+function csvList(itemMax: number) {
+  return z
+    .string()
+    .max(2000)
+    .optional()
+    .catch(undefined)
+    .transform((v) =>
+      (v ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s && s.length <= itemMax && !CONTROL_CHARS.test(s)),
+    );
+}
+
+const knownOnly = <T extends string>(list: string[], known: readonly T[]) =>
+  unique(list.filter((v): v is T => (known as readonly string[]).includes(v)));
+
 export const productsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(40),
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
@@ -217,6 +271,23 @@ export const productsQuerySchema = z.object({
     .enum(['1', 'true', '0', 'false'])
     .optional()
     .transform((v) => v === '1' || v === 'true'),
+  /** Цена «от» и «до», копейки. */
+  priceMin: z.coerce.number().int().min(0).max(LIMITS.priceMax).optional().catch(undefined),
+  priceMax: z.coerce.number().int().min(0).max(LIMITS.priceMax).optional().catch(undefined),
+  /** Списки через запятую. Неизвестные значения игнорируются — старые ссылки не ломаются. */
+  brands: csvList(100).transform((list) => unique(list.map(brandKey)).slice(0, 50)),
+  sizes: csvList(SIZE_LABEL_MAX).transform((list) => unique(list.map(normalizeSizeLabel)).slice(0, 50)),
+  colors: csvList(20).transform((list) => knownOnly(list, COLOR_KEYS)),
+  materials: csvList(20).transform((list) => knownOnly(list, MATERIAL_KEYS)),
+  seasons: csvList(20).transform((list) => knownOnly(list, SEASONS)),
+  /** men — мужское и унисекс, women — женское и унисекс, unisex — только унисекс. */
+  gender: z.enum(GENDERS).optional().catch(undefined),
+});
+export type ProductsQuery = z.infer<typeof productsQuerySchema>;
+
+/** Фасеты считаются по категории — без остальных фильтров, иначе варианты исчезали бы при выборе. */
+export const facetsQuerySchema = z.object({
+  categoryId: z.coerce.number().int().positive().optional(),
 });
 
 // ---------- Рассылка ----------

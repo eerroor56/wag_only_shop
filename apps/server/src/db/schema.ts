@@ -4,7 +4,7 @@
  * Соглашения:
  *  - деньги хранятся в копейках (integer);
  *  - все даты — timestamptz;
- *  - новые характеристики товара (бренд, размер, категория, артикул, наличие) добавляются
+ *  - новые характеристики товара (например, артикул) добавляются
  *    отдельными nullable-колонками / таблицами через обычную миграцию drizzle-kit — существующие
  *    данные и API при этом не ломаются. Свободные характеристики уже доступны через `attributes`.
  */
@@ -27,7 +27,15 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { BROADCAST_STATUSES, ORDER_STATUSES, type ProductAttribute } from '@wag/shared';
+import {
+  BROADCAST_STATUSES,
+  ORDER_STATUSES,
+  type ColorKey,
+  type Gender,
+  type MaterialKey,
+  type ProductAttribute,
+  type Season,
+} from '@wag/shared';
 
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () =>
@@ -109,6 +117,20 @@ export const products = pgTable(
     titleSort: text('title_sort').generatedAlwaysAs(
       sql`lower(translate(title, 'ЁёАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ', 'ееабвгдежзийклмнопрстуфхцчшщъыьэюя'))`,
     ),
+    /** Бренд как его ввёл администратор. */
+    brand: varchar('brand', { length: 60 }),
+    /** Ключ бренда для фильтра (brandKey: нижний регистр, ё → е). Считается в приложении. */
+    brandKey: varchar('brand_key', { length: 60 }),
+    /** Цвет для покупателя; colors — значения палитры (COLOR_PALETTE) для фильтра. */
+    colorName: varchar('color_name', { length: 60 }),
+    colors: text('colors').array().$type<ColorKey[]>().notNull().default(sql`'{}'::text[]`),
+    /** Материал / состав для покупателя; materials — значения палитры (MATERIAL_PALETTE). */
+    materialName: varchar('material_name', { length: 120 }),
+    materials: text('materials').array().$type<MaterialKey[]>().notNull().default(sql`'{}'::text[]`),
+    /** men | women | unisex; null — не указан. */
+    gender: varchar('gender', { length: 10 }).$type<Gender>(),
+    /** summer | demi | winter | all. */
+    seasons: text('seasons').array().$type<Season[]>().notNull().default(sql`'{}'::text[]`),
     /** Категория; при удалении категории товары остаются без неё. */
     categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
     isActive: boolean('is_active').notNull().default(true),
@@ -119,6 +141,8 @@ export const products = pgTable(
   (t) => [
     index('products_catalog_idx').on(t.isActive, t.sortOrder, t.id),
     index('products_category_idx').on(t.categoryId, t.isActive, t.sortOrder),
+    index('products_brand_idx').on(t.brandKey),
+    check('products_gender_check', sql`${t.gender} IS NULL OR ${t.gender} IN ('men', 'women', 'unisex')`),
     check('products_price_check', sql`${t.price} >= 0`),
     check('products_stock_total_check', sql`${t.stockTotal} IS NULL OR ${t.stockTotal} >= 0`),
     check('products_old_price_check', sql`${t.oldPrice} IS NULL OR ${t.oldPrice} > ${t.price}`),

@@ -7,7 +7,7 @@
  */
 import sharp from 'sharp';
 import { count, eq } from 'drizzle-orm';
-import { categoryNameKey } from '@wag/shared';
+import { brandKey, categoryNameKey, type ColorKey, type Gender, type MaterialKey, type Season } from '@wag/shared';
 import { loadConfig } from '../config.js';
 import { createStorage } from '../storage/index.js';
 import { createDb } from './client.js';
@@ -20,6 +20,13 @@ interface DemoProduct {
   oldPrice?: number;
   discountPercent?: number;
   attributes: { name: string; value: string }[];
+  brand?: string;
+  colorName?: string;
+  colors?: ColorKey[];
+  materialName?: string;
+  materials?: MaterialKey[];
+  gender?: Gender;
+  seasons?: Season[];
   sizes?: string[];
   /** Остатки по размерам (или { '': n } без размеров); не задано — не учитываются. */
   stock?: Record<string, number>;
@@ -36,11 +43,14 @@ const DEMO: DemoProduct[] = [
       'Худи на молнии из фирменного флиса Tech Fleece. Лёгкое, тёплое, с минималистичным силуэтом.\n\nМягкая внутренняя поверхность, карман на молнии на рукаве.',
     price: rub(19_990),
     oldPrice: rub(24_990),
-    attributes: [
-      { name: 'Бренд', value: 'Nike' },
-      { name: 'Материал', value: '66% хлопок, 34% полиэстер' },
-      { name: 'Цвет', value: 'Чёрный' },
-    ],
+    attributes: [{ name: 'Посадка', value: 'Приталенная' }],
+    brand: 'Nike',
+    colorName: 'Чёрный',
+    colors: ['black'],
+    materialName: '66% хлопок, 34% полиэстер',
+    materials: ['cotton', 'polyester'],
+    gender: 'men',
+    seasons: ['demi'],
     sizes: ['S', 'M', 'L', 'XL'],
     stock: { S: 2, M: 5, L: 0, XL: 1 },
     category: 'Худи',
@@ -50,10 +60,14 @@ const DEMO: DemoProduct[] = [
     title: 'Adidas Originals Trefoil',
     description: 'Классический лонгслив Adidas Originals с вышитым логотипом Trefoil. Свободный крой.',
     price: rub(7_490),
-    attributes: [
-      { name: 'Бренд', value: 'Adidas Originals' },
-      { name: 'Материал', value: '100% хлопок' },
-    ],
+    attributes: [],
+    brand: 'Adidas Originals',
+    colorName: 'Белый',
+    colors: ['white'],
+    materialName: '100% хлопок',
+    materials: ['cotton'],
+    gender: 'unisex',
+    seasons: ['all'],
     sizes: ['M/L', 'XL/XXL'],
     category: 'Лонгсливы',
     shades: ['#e5e5ea', '#d1d1d6', '#c7c7cc'],
@@ -64,10 +78,14 @@ const DEMO: DemoProduct[] = [
     price: rub(42_000),
     oldPrice: rub(56_000),
     discountPercent: 25,
-    attributes: [
-      { name: 'Бренд', value: 'Stone Island' },
-      { name: 'Страна', value: 'Италия' },
-    ],
+    attributes: [{ name: 'Страна', value: 'Италия' }],
+    brand: 'Stone Island',
+    colorName: 'Графит',
+    colors: ['grey'],
+    materialName: 'Хлопок',
+    materials: ['cotton'],
+    gender: 'men',
+    seasons: ['demi'],
     sizes: ['46', '48', '50', '52', '54'],
     stock: { 46: 0, 48: 0, 50: 0, 52: 0, 54: 0 },
     category: 'Верхняя одежда',
@@ -77,10 +95,14 @@ const DEMO: DemoProduct[] = [
     title: 'The North Face Nuptse 1996',
     description: 'Культовый пуховик в стиле 90-х. Наполнитель — гусиный пух 700 fill power. Капюшон убирается в воротник.',
     price: rub(38_990),
-    attributes: [
-      { name: 'Бренд', value: 'The North Face' },
-      { name: 'Утеплитель', value: 'Пух 700 FP' },
-    ],
+    attributes: [{ name: 'Утеплитель', value: 'Пух 700 FP' }],
+    brand: 'The North Face',
+    colorName: 'Чёрный',
+    colors: ['black'],
+    materialName: 'Нейлон, гусиный пух',
+    materials: ['nylon', 'down'],
+    gender: 'unisex',
+    seasons: ['winter'],
     sizes: ['48-52', '52/54'],
     category: 'Верхняя одежда',
     shades: ['#0f0f10', '#1c1c1e', '#2c2c2e'],
@@ -90,7 +112,14 @@ const DEMO: DemoProduct[] = [
     description: 'Кроссовки Made in USA. Замша и сетка, амортизация ENCAP.',
     price: rub(27_490),
     oldPrice: rub(31_990),
-    attributes: [{ name: 'Бренд', value: 'New Balance' }],
+    attributes: [],
+    brand: 'New Balance',
+    colorName: 'Серый',
+    colors: ['grey'],
+    materialName: 'Замша, сетка',
+    materials: ['suede', 'mesh'],
+    gender: 'unisex',
+    seasons: ['summer', 'demi'],
     sizes: ['41', '42', '43', '44'],
     stock: { 41: 1, 42: 3, 43: 2, 44: 0 },
     category: 'Кроссовки',
@@ -100,7 +129,14 @@ const DEMO: DemoProduct[] = [
     title: 'Carhartt WIP Chase Hoodie',
     description: 'Худи из мягкого футера с вышитым логотипом.',
     price: rub(11_990),
-    attributes: [{ name: 'Бренд', value: 'Carhartt WIP' }],
+    attributes: [],
+    brand: 'Carhartt WIP',
+    colorName: 'Тёмно-серый',
+    colors: ['grey'],
+    materialName: 'Футер: 80% хлопок, 20% полиэстер',
+    materials: ['cotton', 'polyester'],
+    gender: 'women',
+    seasons: ['demi', 'winter'],
     category: 'Худи',
     shades: ['#3a3a3c', '#48484a'],
   },
@@ -164,6 +200,14 @@ async function main() {
           oldPrice: demo.oldPrice ?? null,
           discountPercent: demo.discountPercent ?? null,
           attributes: demo.attributes,
+          brand: demo.brand ?? null,
+          brandKey: demo.brand ? brandKey(demo.brand) : null,
+          colorName: demo.colorName ?? null,
+          colors: demo.colors ?? [],
+          materialName: demo.materialName ?? null,
+          materials: demo.materials ?? [],
+          gender: demo.gender ?? null,
+          seasons: demo.seasons ?? [],
           sizes: demo.sizes ?? [],
           stock: demo.stock ?? null,
           stockTotal: demo.stock ? Object.values(demo.stock).reduce((a, b) => a + b, 0) : null,

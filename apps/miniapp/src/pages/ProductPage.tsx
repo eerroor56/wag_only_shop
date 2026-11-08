@@ -1,5 +1,5 @@
 import { ArrowLeft, PackageX } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   EmptyState,
@@ -12,8 +12,17 @@ import {
   useTelegramBackButton,
   useToast,
   ApiError,
+  ColorDots,
 } from '@wag/web';
-import { availableStock, LOW_STOCK_THRESHOLD } from '@wag/shared';
+import {
+  availableStock,
+  brandKey,
+  colorDisplay,
+  GENDER_LABELS,
+  LOW_STOCK_THRESHOLD,
+  materialDisplay,
+  SEASON_LABELS,
+} from '@wag/shared';
 import { useAddToCart, useCart, useProduct, useUpdateCartItem } from '../api/queries';
 import { Gallery } from '../components/Gallery';
 import { QuantityStepper } from '../components/QuantityStepper';
@@ -86,6 +95,33 @@ export function ProductPage() {
       },
     );
   };
+
+  // Характеристики из фильтров — первыми в списке; бренд ведёт в каталог с этим брендом.
+  const specs: [string, ReactNode][] = [];
+  if (product) {
+    const color = colorDisplay(product.colorName, product.colors);
+    const material = materialDisplay(product.materialName, product.materials);
+    if (product.brand) {
+      specs.push([
+        'Бренд',
+        <Link key="brand" to={`/catalog?brand=${encodeURIComponent(brandKey(product.brand))}`} className="attribute-link">
+          {product.brand}
+        </Link>,
+      ]);
+    }
+    if (color) {
+      specs.push([
+        'Цвет',
+        <span key="color" className="attribute-color">
+          {product.colors.length > 0 && <ColorDots keys={product.colors} size={14} />}
+          {color}
+        </span>,
+      ]);
+    }
+    if (material) specs.push(['Материал', material]);
+    if (product.gender) specs.push(['Пол', GENDER_LABELS[product.gender]]);
+    if (product.seasons.length) specs.push(['Сезон', product.seasons.map((s) => SEASON_LABELS[s]).join(', ')]);
+  }
 
   const backButton = (
     <button type="button" className="floating-back" onClick={goBack}>
@@ -191,8 +227,14 @@ export function ProductPage() {
 
         {product.description && <p className="product-description">{product.description}</p>}
 
-        {product.attributes.length > 0 && (
+        {(specs.length > 0 || product.attributes.length > 0) && (
           <dl className="attributes">
+            {specs.map(([name, value]) => (
+              <div className="attribute-row" key={name}>
+                <dt>{name}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
             {product.attributes.map((a, i) => (
               <div className="attribute-row" key={`${a.name}-${i}`}>
                 <dt>{a.name}</dt>

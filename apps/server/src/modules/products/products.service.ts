@@ -1,5 +1,13 @@
-import { and, asc, count, desc, eq, inArray, isNull, lt, min, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, max, min, or, sql, type SQL } from 'drizzle-orm';
 import {
+  brandKey,
+  COLOR_KEYS,
+  GENDERS,
+  MATERIAL_KEYS,
+  SEASONS,
+  sortSizes,
+  type CatalogFacetsDTO,
+  type ProductsQuery,
   effectiveDiscountPercent,
   isSoldOut,
   normalizeStock,
@@ -28,6 +36,13 @@ import { galleryOrder, mainImage, sortImages, toAdminImageDTO, toImageDTO } from
 
 const ORPHAN_IMAGE_TTL_MS = 24 * 60 * 60 * 1000;
 
+/** Массив text[] параметрами: ARRAY[$1, $2]::text[] (обычный параметр-массив drizzle развернул бы в список). */
+const textArray = (values: readonly string[]) =>
+  sql`ARRAY[${sql.join(
+    values.map((v) => sql`${v}`),
+    sql`, `,
+  )}]::text[]`;
+
 export class ProductsService {
   constructor(
     private readonly db: Database,
@@ -42,6 +57,7 @@ export class ProductsService {
     return {
       id: p.id,
       title: p.title,
+      brand: p.brand,
       price: p.price,
       oldPrice: p.oldPrice != null && p.oldPrice > p.price ? p.oldPrice : null,
       discountPercent: effectiveDiscountPercent(p),
@@ -64,6 +80,7 @@ export class ProductsService {
       discountPercent: p.discountPercent,
       effectiveDiscountPercent: effectiveDiscountPercent(p),
       attributes: p.attributes,
+      ...this.filterFields(p),
       sizes: p.sizes,
       stock: p.stock,
       stockTotal: p.stockTotal,
@@ -73,6 +90,32 @@ export class ProductsService {
       images: sorted.map((i): AdminImageDTO => ({ ...toAdminImageDTO(i, this.storage), isMain: i.id === main?.id })),
       createdAt: p.createdAt.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
+    };
+  }
+
+  private filterFields(p: Product) {
+    return {
+      brand: p.brand,
+      colorName: p.colorName,
+      colors: p.colors,
+      materialName: p.materialName,
+      materials: p.materials,
+      gender: p.gender,
+      seasons: p.seasons,
+    };
+  }
+
+  /** Колонки фильтров для insert / update. */
+  private filterColumns(f: ProductFields) {
+    return {
+      brand: f.brand,
+      brandKey: f.brand ? brandKey(f.brand) : null,
+      colorName: f.colorName,
+      colors: f.colors,
+      materialName: f.materialName,
+      materials: f.materials,
+      gender: f.gender,
+      seasons: f.seasons,
     };
   }
 
@@ -101,21 +144,36 @@ export class ProductsService {
 
   // ------------------------------------------------------------------ catalog (покупатель)
 
-  async listCatalog(params: {
-    limit: number;
-    offset: number;
-    categoryId?: number;
-    sort?: CatalogSort;
-    q?: string;
-    inStock?: boolean;
-  }): Promise<ProductsPageDTO> {
+  async listCatalog(
+    params: { limit: number; offset: number } & Partial<Omit<ProductsQuery, 'limit' | 'offset'>>,
+  ): Promise<ProductsPageDTO> {
     const { limit, offset } = params;
     const search = params.q ? titleSearchKey(params.q) : '';
+    const sizes = params.sizes?.map((s) => s.toLowerCase()) ?? [];
     const where = and(
       eq(products.isActive, true),
       params.categoryId !== undefined ? eq(products.categoryId, params.categoryId) : undefined,
       search ? sql`${products.titleSort} LIKE ${`%${escapeLike(search)}%`}` : undefined,
       params.inStock ? or(isNull(products.stockTotal), sql`${products.stockTotal} > 0`) : undefined,
+      params.priceMin != null ? gte(products.price, params.priceMin) : undefined,
+      params.priceMax != null ? lte(products.price, params.priceMax) : undefined,
+      params.brands?.length ? inArray(products.brandKey, params.brands) : undefined,
+      params.colors?.length ? sql`${products.colors} && ${textArray(params.colors)}` : undefined,
+      params.materials?.length ? sql`${products.materials} && ${textArray(params.materials)}` : undefined,
+      // «Всесезонные» вещи подходят под любой выбранный сезон.
+      params.seasons?.length ? sql`${products.seasons} && ${textArray([...params.seasons, 'all'])}` : undefined,
+      // Мужское / женское включает унисекс.
+      params.gender
+        ? inArray(products.gender, params.gender === 'unisex' ? ['unisex'] : [params.gender, 'unisex'])
+        : undefined,
+      // Размер подходит, только если он есть в наличии (или остатки не учитываются).
+      sizes.length
+        ? sql`EXISTS (
+            SELECT 1 FROM unnest(${products.sizes}) AS s(size)
+            WHERE lower(s.size) = ANY(${textArray(sizes)})
+              AND (${products.stock} IS NULL OR coalesce((${products.stock} ->> s.size)::int, 0) > 0)
+          )`
+        : undefined,
     );
     // Закончившиеся товары — в конце списка при любой сортировке, как на маркетплейсах.
     const soldOutLast = sql`(coalesce(${products.stockTotal}, 1) = 0)`;
@@ -146,6 +204,69 @@ export class ProductsService {
     };
   }
 
+  /**
+   * Значения фильтров каталога по товарам в продаже (в выбранной категории): бренды, размеры в наличии,
+   * цвета, материалы, сезоны, пол и максимальная цена. Пустые группы фильтр не показывает.
+   */
+  async catalogFacets(categoryId?: number): Promise<CatalogFacetsDTO> {
+    const scope = and(
+      eq(products.isActive, true),
+      categoryId !== undefined ? eq(products.categoryId, categoryId) : undefined,
+    )!;
+    const unnested = async (column: typeof products.colors | typeof products.materials | typeof products.seasons) => {
+      const res = await this.db.execute<{ value: string; count: number }>(sql`
+        SELECT v AS value, count(*)::int AS count
+        FROM ${products}, unnest(${column}) AS v
+        WHERE ${scope}
+        GROUP BY v
+      `);
+      return res.rows;
+    };
+    const byOrder = <T extends string>(rows: { value: string; count: number }[], order: readonly T[]) =>
+      order.flatMap((value) => {
+        const row = rows.find((r) => r.value === value);
+        return row ? [{ value, count: row.count }] : [];
+      });
+
+    const [[price], brands, genders, sizeRows, colorRows, materialRows, seasonRows] = await Promise.all([
+      this.db.select({ max: max(products.price) }).from(products).where(scope),
+      this.db
+        .select({ value: products.brandKey, label: min(products.brand), count: count() })
+        .from(products)
+        .where(and(scope, isNotNull(products.brandKey)))
+        .groupBy(products.brandKey)
+        .orderBy(products.brandKey),
+      this.db
+        .select({ value: products.gender, count: count() })
+        .from(products)
+        .where(and(scope, isNotNull(products.gender)))
+        .groupBy(products.gender),
+      this.db.execute<{ value: string; count: number }>(sql`
+        SELECT s AS value, count(*)::int AS count
+        FROM ${products}, unnest(${products.sizes}) AS s
+        WHERE ${scope} AND (${products.stock} IS NULL OR coalesce((${products.stock} ->> s)::int, 0) > 0)
+        GROUP BY s
+      `),
+      unnested(products.colors),
+      unnested(products.materials),
+      unnested(products.seasons),
+    ]);
+
+    const sizeCounts = new Map(sizeRows.rows.map((r) => [r.value, r.count]));
+    return {
+      priceMax: price?.max ?? 0,
+      brands: brands.map((b) => ({ value: b.value!, label: b.label ?? b.value!, count: b.count })),
+      genders: byOrder(
+        genders.map((g) => ({ value: g.value ?? '', count: g.count })),
+        GENDERS,
+      ),
+      sizes: sortSizes([...sizeCounts.keys()]).map((value) => ({ value, count: sizeCounts.get(value)! })),
+      colors: byOrder(colorRows, COLOR_KEYS),
+      materials: byOrder(materialRows, MATERIAL_KEYS),
+      seasons: byOrder(seasonRows, SEASONS),
+    };
+  }
+
   async getCatalogProduct(id: number): Promise<ProductDetailDTO> {
     const product = await this.db.query.products.findFirst({
       where: and(eq(products.id, id), eq(products.isActive, true)),
@@ -165,6 +286,7 @@ export class ProductsService {
       ...this.toCard(product, gallery[0]),
       category: category ?? null,
       description: product.description,
+      ...this.filterFields(product),
       attributes: product.attributes,
       images: gallery.map((i) => toImageDTO(i, this.storage)),
     };
@@ -213,6 +335,7 @@ export class ProductsService {
           stock,
           stockTotal: stockTotal(stock),
           categoryId: input.categoryId,
+          ...this.filterColumns(input),
           isActive: input.isActive,
           sortOrder: (minOrder ?? 1) - 1,
         })
@@ -240,6 +363,13 @@ export class ProductsService {
         sizes: patch.sizes ?? current.sizes,
         stock: patch.stock !== undefined ? patch.stock : current.stock,
         categoryId: patch.categoryId !== undefined ? patch.categoryId : current.categoryId,
+        brand: patch.brand !== undefined ? patch.brand : current.brand,
+        colorName: patch.colorName !== undefined ? patch.colorName : current.colorName,
+        colors: patch.colors ?? current.colors,
+        materialName: patch.materialName !== undefined ? patch.materialName : current.materialName,
+        materials: patch.materials ?? current.materials,
+        gender: patch.gender !== undefined ? patch.gender : current.gender,
+        seasons: patch.seasons ?? current.seasons,
         isActive: patch.isActive ?? current.isActive,
         imageIds: patch.imageIds ?? sorted.map((i) => i.id),
         mainImageId: patch.mainImageId !== undefined ? patch.mainImageId : (mainImage(sorted)?.id ?? null),
@@ -263,6 +393,7 @@ export class ProductsService {
           stock,
           stockTotal: stockTotal(stock),
           categoryId: merged.categoryId,
+          ...this.filterColumns(merged),
           isActive: merged.isActive,
         })
         .where(eq(products.id, id));

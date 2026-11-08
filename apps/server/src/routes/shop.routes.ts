@@ -1,5 +1,12 @@
 import type { FastifyInstance } from 'fastify';
-import { cartAddSchema, cartUpdateSchema, checkoutSchema, idParamSchema, productsQuerySchema } from '@wag/shared';
+import {
+  cartAddSchema,
+  cartUpdateSchema,
+  checkoutSchema,
+  facetsQuerySchema,
+  idParamSchema,
+  productsQuerySchema,
+} from '@wag/shared';
 import type { AppContext } from '../context.js';
 import { notFound, parseInput } from '../lib/errors.js';
 import { getAuth } from '../plugins/auth.js';
@@ -13,6 +20,11 @@ export async function shopRoutes(app: FastifyInstance, ctx: AppContext) {
   app.get('/api/products', async (req) => {
     const q = parseInput(productsQuerySchema, req.query);
     return ctx.products.listCatalog(q);
+  });
+
+  app.get('/api/products/facets', async (req) => {
+    const { categoryId } = parseInput(facetsQuerySchema, req.query);
+    return ctx.products.catalogFacets(categoryId);
   });
 
   app.get('/api/categories', async () => ctx.categories.listPublic());

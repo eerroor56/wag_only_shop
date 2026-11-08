@@ -10,7 +10,11 @@ import {
   suggestPriceFromDiscount,
   type AdminImageDTO,
   type AdminProductDTO,
+  type ColorKey,
+  type Gender,
+  type MaterialKey,
   type ProductFields,
+  type Season,
 } from '@wag/shared';
 import {
   ApiError,
@@ -26,6 +30,7 @@ import {
 import { uploadImage, useAdminProduct, useDeleteProduct, useSaveProduct } from '../api/queries';
 import { PageHeader } from '../components/common';
 import { CategoryPicker } from '../components/CategoryPicker';
+import { BrandField, GenderField, PaletteField, SeasonField } from '../components/FilterFields';
 import { SizesEditor } from '../components/SizesEditor';
 import { parseStockDraft, StockEditor, type StockDraft } from '../components/StockEditor';
 
@@ -44,6 +49,13 @@ interface FormState {
   /** Переключатель «Учитывать остатки». */
   trackStock: boolean;
   stock: StockDraft;
+  brand: string;
+  colorName: string;
+  colors: ColorKey[];
+  materialName: string;
+  materials: MaterialKey[];
+  gender: Gender | null;
+  seasons: Season[];
 }
 
 interface PendingUpload {
@@ -67,6 +79,13 @@ const EMPTY: FormState = {
   categoryId: null,
   trackStock: false,
   stock: {},
+  brand: '',
+  colorName: '',
+  colors: [],
+  materialName: '',
+  materials: [],
+  gender: null,
+  seasons: [],
 };
 
 let keySeq = 1;
@@ -85,6 +104,13 @@ function fromProduct(p: AdminProductDTO): FormState {
     categoryId: p.categoryId,
     trackStock: p.stock != null,
     stock: Object.fromEntries(Object.entries(p.stock ?? {}).map(([k, v]) => [k, String(v)])),
+    brand: p.brand ?? '',
+    colorName: p.colorName ?? '',
+    colors: p.colors,
+    materialName: p.materialName ?? '',
+    materials: p.materials,
+    gender: p.gender,
+    seasons: p.seasons,
   };
 }
 
@@ -126,6 +152,13 @@ function toPayload(
       .filter((a) => a.name || a.value),
     sizes: form.sizes,
     categoryId: form.categoryId,
+    brand: form.brand,
+    colorName: form.colorName,
+    colors: form.colors,
+    materialName: form.materialName,
+    materials: form.materials,
+    gender: form.gender,
+    seasons: form.seasons,
     stock,
     imageIds: images.map((i) => i.id),
     mainImageId: mainImageId ?? images[0]?.id ?? null,
@@ -552,13 +585,40 @@ export function ProductEditorPage() {
           error={errors.stock}
         />
 
+        {/* --------------------------------------------------- Характеристики для фильтров */}
+        <section className="card editor-card">
+          <div className="editor-card-head">
+            <span className="switch-title">Фильтры каталога</span>
+            <span className="caption">По этим полям покупатели находят товар в фильтрах и видят их в карточке.</span>
+          </div>
+          <BrandField value={form.brand} onChange={(v) => set('brand', v)} error={errors.brand} />
+          <GenderField value={form.gender} onChange={(v) => set('gender', v)} />
+          <PaletteField
+            kind="color"
+            text={form.colorName}
+            onText={(v) => set('colorName', v)}
+            keys={form.colors}
+            onKeys={(v) => set('colors', v)}
+            error={errors.colorName || errors.colors}
+          />
+          <PaletteField
+            kind="material"
+            text={form.materialName}
+            onText={(v) => set('materialName', v)}
+            keys={form.materials}
+            onKeys={(v) => set('materials', v)}
+            error={errors.materialName || errors.materials}
+          />
+          <SeasonField value={form.seasons} onChange={(v) => set('seasons', v)} />
+        </section>
+
         {/* --------------------------------------------------- Описание */}
         <label className="field">
           <span className="field-label">Описание</span>
           <textarea
             className="textarea"
             rows={6}
-            placeholder="Материал, посадка, особенности…"
+            placeholder="Посадка, особенности, уход…"
             maxLength={LIMITS.productDescriptionMax}
             value={form.description}
             aria-invalid={Boolean(errors.description)}
@@ -577,7 +637,7 @@ export function ProductEditorPage() {
             <div className="attr-row" key={a.key}>
               <input
                 className="input"
-                placeholder="Бренд"
+                placeholder="Страна"
                 maxLength={LIMITS.productAttributeNameMax}
                 value={a.name}
                 onChange={(e) =>
@@ -589,7 +649,7 @@ export function ProductEditorPage() {
               />
               <input
                 className="input"
-                placeholder="Nike"
+                placeholder="Италия"
                 maxLength={LIMITS.productAttributeValueMax}
                 value={a.value}
                 onChange={(e) =>

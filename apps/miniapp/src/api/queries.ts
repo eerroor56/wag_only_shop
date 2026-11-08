@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-query';
 import type {
   CartDTO,
-  CatalogSort,
+  CatalogFacetsDTO,
   CategoryDTO,
   CheckoutInput,
   MeDTO,
@@ -18,6 +18,9 @@ import type {
   PublicConfigDTO,
 } from '@wag/shared';
 import { api, ApiError } from '@wag/web';
+import { catalogApiParams, filtersKey, type CatalogFilters } from '../catalog-filters';
+
+export type { CatalogFilters } from '../catalog-filters';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,7 +37,9 @@ export const keys = {
   config: ['config'] as const,
   me: ['me'] as const,
   categories: ['categories'] as const,
-  products: (f: CatalogFilters) => ['products', f.categoryId ?? 'all', f.sort, f.q, f.inStock] as const,
+  products: (f: CatalogFilters) => ['products', filtersKey(f)] as const,
+  productsCount: (f: Partial<CatalogFilters>) => ['products-count', filtersKey(f)] as const,
+  facets: (categoryId: number | null) => ['facets', categoryId ?? 'all'] as const,
   search: (q: string) => ['product-search', q] as const,
   product: (id: number) => ['product', id] as const,
   cart: ['cart'] as const,
@@ -66,21 +71,28 @@ export function useCategories() {
   });
 }
 
-export interface CatalogFilters {
-  categoryId: number | null;
-  sort: CatalogSort;
-  /** Поиск по названию (уже без лишних пробелов). */
-  q: string;
-  inStock: boolean;
+const catalogParams = catalogApiParams;
+
+/** Значения для панели фильтров (бренды, размеры, цвета…) по товарам выбранной категории. */
+export function useFacets(categoryId: number | null) {
+  return useQuery({
+    queryKey: keys.facets(categoryId),
+    queryFn: ({ signal }) =>
+      api.get<CatalogFacetsDTO>(`/api/products/facets${categoryId != null ? `?categoryId=${categoryId}` : ''}`, signal),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
 }
 
-function catalogParams(f: Partial<CatalogFilters>, limit: number, offset = 0): URLSearchParams {
-  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-  if (f.categoryId != null) params.set('categoryId', String(f.categoryId));
-  if (f.sort && f.sort !== 'default') params.set('sort', f.sort);
-  if (f.q) params.set('q', f.q);
-  if (f.inStock) params.set('inStock', '1');
-  return params;
+/** Сколько товаров найдётся с черновиком фильтров — для кнопки «Показать N товаров». */
+export function useCatalogCount(filters: Partial<CatalogFilters>, enabled: boolean) {
+  return useQuery<number>({
+    queryKey: keys.productsCount(filters),
+    queryFn: ({ signal }) => api.get<ProductsPageDTO>(`/api/products?${catalogParams(filters, 1)}`, signal).then((p) => p.total),
+    enabled,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useCatalog(filters: CatalogFilters) {

@@ -1,4 +1,5 @@
 import type { BroadcastStatus, OrderStatus } from './order-status.js';
+import type { ColorKey, Gender, MaterialKey, Season } from './filters.js';
 import type { FieldIssue, ProductAttribute } from './schemas.js';
 
 /** Даты передаются строками ISO 8601, деньги — целыми копейками. */
@@ -40,6 +41,7 @@ export interface ImageDTO {
 export interface ProductCardDTO {
   id: number;
   title: string;
+  brand: string | null;
   price: number;
   oldPrice: number | null;
   /** Процент скидки для отображения (ручной или вычисленный), null — без скидки. */
@@ -72,6 +74,13 @@ export interface AdminCategoryDTO {
 export interface ProductDetailDTO extends ProductCardDTO {
   category: { id: number; name: string } | null;
   description: string;
+  /** Цвет, как его назвал администратор; colors — значения палитры для фильтра. */
+  colorName: string | null;
+  colors: ColorKey[];
+  materialName: string | null;
+  materials: MaterialKey[];
+  gender: Gender | null;
+  seasons: Season[];
   attributes: ProductAttribute[];
   /** Галерея: главное фото первым, далее в порядке администратора. */
   images: ImageDTO[];
@@ -152,6 +161,13 @@ export interface AdminProductDTO {
   /** Что увидит покупатель. */
   effectiveDiscountPercent: number | null;
   attributes: ProductAttribute[];
+  brand: string | null;
+  colorName: string | null;
+  colors: ColorKey[];
+  materialName: string | null;
+  materials: MaterialKey[];
+  gender: Gender | null;
+  seasons: Season[];
   sizes: string[];
   /** null — остатки не учитываются. */
   stock: Record<string, number> | null;

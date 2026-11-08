@@ -20,6 +20,7 @@ export function ProductCard({ product, eager = false }: { product: ProductCardDT
         )}
       </div>
       <div className="product-card-body">
+        {product.brand && <div className="product-card-brand">{product.brand}</div>}
         <div className="product-card-title line-clamp-2">{product.title}</div>
         <PriceView price={product.price} oldPrice={product.oldPrice} discountPercent={null} size="sm" />
         {!product.soldOut && sizes.length > 0 && <div className="product-card-sizes">{sizes.join(' · ')}</div>}
