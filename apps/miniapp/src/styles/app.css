@@ -133,6 +133,18 @@
   object-position: center 49%;
 }
 
+/* Светлая тема Telegram: баннер чёрно-белый, поэтому просто инвертируем — чёрный логотип на белом. */
+:root[data-theme='light'] .home-banner {
+  background: #ffffff;
+  /* Белый баннер на белом фоне — с тонкой рамкой (outline рисуется поверх картинки). */
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+}
+
+:root[data-theme='light'] .home-banner img {
+  filter: invert(1);
+}
+
 .home-title {
   font-size: 30px;
   font-weight: 700;
